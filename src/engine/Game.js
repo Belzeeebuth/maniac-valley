@@ -15,6 +15,7 @@ import { Sprites } from '../graphics/SpriteSheetGenerator.js';
 import { PostFX } from '../graphics/PostFX.js';
 import { Player } from '../entities/Player.js';
 import { makeAnimal, updateAnimal, animalProduce } from '../entities/Animal.js';
+import { makeVillager, updateVillager, GREETINGS, CHILD_LINES } from '../entities/Villager.js';
 import { empowerEnemy } from '../entities/Enemy.js';
 import { CROPS, growPlot, isReady } from '../entities/Crop.js';
 import { Inventory, ITEMS } from '../systems/Inventory.js';
@@ -165,7 +166,7 @@ export class Game {
     set(hx + 2, hy + hh - 1, OT.PATH); set(hx + 3, hy + hh - 1, OT.PATH);
     set(hx + 2, hy + 1, OT.BED);
     this.bedPos = { x: (hx + 2) * TILE + TILE / 2, y: (hy + 1) * TILE + TILE / 2 };
-    buildings.push({ x: hx, y: hy, w: hw, h: hh, type: 'home' });
+    buildings.push({ x: hx, y: hy, w: hw, h: hh, type: 'home', roof: '#8a3a34' });
 
     for (let y = hy + hh + 1; y < hy + hh + 9; y++) for (let x = hx - 2; x < hx + 12; x++)
       if (grid[y] && grid[y][x] !== undefined && grid[y][x] !== OT.WATER) grid[y][x] = OT.GRASS;
@@ -194,12 +195,55 @@ export class Game {
     set(38, 16, OT.QUESTBOARD);
     this.boardPos = { x: 38 * TILE + TILE / 2, y: 16 * TILE + TILE / 2 };
 
-    const deco = (bx, by, bw, bh) => {
+    const deco = (bx, by, bw, bh, roof) => {
       for (let y = by; y < by + bh; y++) for (let x = bx; x < bx + bw; x++)
         set(x, y, (x === bx || x === bx + bw - 1 || y === by || y === by + bh - 1) ? OT.WALL : OT.PATH);
-      buildings.push({ x: bx, y: by, w: bw, h: bh, type: 'deco' });
+      const b = { x: bx, y: by, w: bw, h: bh, type: 'deco', roof: roof || '#8a3a34' };
+      buildings.push(b);
+      return b;
     };
-    deco(44, 8, 5, 4); deco(44, 16, 5, 4); deco(34, 26, 5, 4);
+
+    // Habitants du village : chaque foyer occupe une maison.
+    const villagers = [];
+    const AD = [
+      { skin: '#e8b98a', hair: '#3a2a18', shirt: '#3f78c4' },
+      { skin: '#c98a5a', hair: '#5a3a20', shirt: '#c0392b' },
+      { skin: '#f0cba0', hair: '#e8c860', shirt: '#3a8a3a' },
+      { skin: '#8a5a3a', hair: '#2a2018', shirt: '#8a4aa8' },
+      { skin: '#e8b98a', hair: '#b03020', shirt: '#d98c33' },
+      { skin: '#d8a878', hair: '#3a2a18', shirt: '#2aa0a0' },
+    ];
+    const ELDER = { skin: '#e8c8a8', hair: '#c8c8c8', shirt: '#6a6a7a' };
+    const CHILD = [
+      { skin: '#f0cba0', hair: '#5a3a20', shirt: '#e0a030' },
+      { skin: '#e8b98a', hair: '#2a2018', shirt: '#e05a8a' },
+    ];
+    let adIdx = 0;
+    const spawnFoyer = (b, comp) => {
+      const bounds = {
+        x1: Math.max(2, b.x - 1) * TILE, y1: (b.y + b.h) * TILE,
+        x2: Math.min(OW_W - 2, b.x + b.w + 1) * TILE, y2: Math.min(OW_H - 2, b.y + b.h + 3) * TILE,
+      };
+      const cx = (b.x + b.w / 2) * TILE, cy = (b.y + b.h + 1) * TILE;
+      for (const who of comp) {
+        const look = who === 'child' ? CHILD[(adIdx) % CHILD.length] : who === 'elder' ? ELDER : AD[adIdx % AD.length];
+        if (who !== 'child') adIdx++;
+        villagers.push(makeVillager(who, cx + rand(-18, 18), cy + rand(-4, 14), bounds, look));
+      }
+    };
+
+    const h1 = deco(44, 8, 5, 4, '#8a3a34');
+    const h2 = deco(44, 16, 5, 4, '#3a6a8a');
+    const h3 = deco(34, 26, 5, 4, '#6a8a3a');
+    const h4 = deco(33, 10, 5, 4, '#8a6a3a');
+    const h5 = deco(44, 24, 5, 4, '#7a3a7a');
+    const h6 = deco(31, 18, 5, 4, '#8a5a34');
+    spawnFoyer(h1, ['adult', 'adult']);          // couple
+    spawnFoyer(h2, ['adult', 'adult', 'child']);  // famille
+    spawnFoyer(h3, ['adult']);                     // seul
+    spawnFoyer(h4, ['elder']);                     // aîné
+    spawnFoyer(h5, ['adult', 'adult']);           // couple
+    spawnFoyer(h6, ['adult', 'adult', 'child']);  // famille
 
     // Entrée de mine
     const mx = 42, my = 32;
@@ -215,7 +259,7 @@ export class Game {
 
     return {
       tilemap: new TileMap(grid, 'overworld'), w: OW_W, h: OW_H,
-      farmland, animals, penBounds, placed: [], ground: [], buildings,
+      farmland, animals, penBounds, placed: [], ground: [], buildings, villagers,
       treeHp: {}, rockHp: {}, treeTimers: {}, rockTimers: {},
     };
   }
@@ -301,8 +345,33 @@ export class Game {
     this.sound.play('ui');
   }
 
+  // ---------------- Ciblage à la souris (max 2 cases) ----------------
+  // Tuile visée = tuile sous le curseur, bornée à 2 cases (Tchebychev) autour
+  // du joueur. Le joueur se tourne vers cette cible au moment de l'action.
+  aimTile() {
+    const p = this.player;
+    const wx = this.input.mouse.x + this.camera.x;
+    const wy = this.input.mouse.y + this.camera.y;
+    let gx = Math.floor(wx / TILE), gy = Math.floor(wy / TILE);
+    const pgx = Math.floor(p.cx / TILE), pgy = Math.floor(p.cy / TILE);
+    const R = 2;
+    let dx = gx - pgx, dy = gy - pgy;
+    dx = Math.max(-R, Math.min(R, dx));
+    dy = Math.max(-R, Math.min(R, dy));
+    gx = pgx + dx; gy = pgy + dy;
+    return { gx, gy, wx: gx * TILE + TILE / 2, wy: gy * TILE + TILE / 2, pgx, pgy };
+  }
+  faceTowardMouse() {
+    const p = this.player;
+    const dx = (this.input.mouse.x + this.camera.x) - p.cx;
+    const dy = (this.input.mouse.y + this.camera.y) - p.cy;
+    if (Math.abs(dx) > Math.abs(dy)) p.facing = dx > 0 ? 'right' : 'left';
+    else p.facing = dy > 0 ? 'down' : 'up';
+  }
+
   // ---------------- Action contextuelle ----------------
   doAction() {
+    this.faceTowardMouse();
     const sel = this.inventory.selectedItem;
     if (sel) {
       const it = ITEMS[sel.id];
@@ -332,7 +401,19 @@ export class Game {
           return true;
         }
       }
-      const f = p.frontTile();
+      for (const vil of this.overworld.villagers) {
+        if (dist(cx, cy, vil.x, vil.y) < TILE * 1.2) {
+          const line = vil.kind === 'child' ? choice(CHILD_LINES) : choice(GREETINGS);
+          this.toast('🗨 ' + line);
+          vil.talkT = 2.5;
+          // le villageois se tourne vers le joueur
+          const dx = cx - vil.x, dy = cy - vil.y;
+          vil.facing = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up');
+          this.sound.play('ui');
+          return true;
+        }
+      }
+      const f = this.aimTile();
       if (isReady(this.overworld.farmland[f.gx + ',' + f.gy])) { this.farming.harvest(f.gx, f.gy); return true; }
     } else {
       const m = this.mine;
@@ -355,7 +436,8 @@ export class Game {
       if (dist(cx, cy, this.boardPos.x, this.boardPos.y) < TILE * 1.4) return 'Clic : Quêtes';
       if (dist(cx, cy, this.minePos.x, this.minePos.y) < TILE * 1.2) return 'Clic : Entrer dans la Mine';
       for (const a of this.overworld.animals) if (dist(cx, cy, a.x, a.y) < TILE * 1.1) return 'Clic : Nourrir (Foin)';
-      const f = p.frontTile();
+      for (const vil of this.overworld.villagers) if (dist(cx, cy, vil.x, vil.y) < TILE * 1.2) return 'Clic : Parler';
+      const f = this.aimTile();
       if (isReady(this.overworld.farmland[f.gx + ',' + f.gy])) return 'Clic : Récolter';
     } else {
       const m = this.mine;
@@ -368,14 +450,16 @@ export class Game {
   }
 
   // ---------------- Placement ----------------
-  placementCell() { const f = this.player.frontTile(); return { gx: f.gx, gy: f.gy }; }
+  placementCell() { const f = this.aimTile(); return { gx: f.gx, gy: f.gy }; }
   placementValid(gx, gy) {
     const s = this.curScene(), t = s.tilemap.get(gx, gy);
     if (t === -1) return false;
     if (this.scene === 'overworld') { if (t !== OT.GRASS && t !== OT.PATH) return false; }
     else if (t !== MT.FLOOR) return false;
     for (const o of s.placed) if (o.gx === gx && o.gy === gy) return false;
-    if (dist(this.player.cx, this.player.cy, gx * TILE + TILE / 2, gy * TILE + TILE / 2) > TILE * 2.2) return false;
+    // portée : 2 cases max autour du joueur
+    const pgx = Math.floor(this.player.cx / TILE), pgy = Math.floor(this.player.cy / TILE);
+    if (Math.abs(gx - pgx) > 2 || Math.abs(gy - pgy) > 2) return false;
     return true;
   }
   tryPlace(sel) {
@@ -488,7 +572,10 @@ export class Game {
       this.time.advance(dt);
       if (this.time.hour >= 26 && !this.faint) this.collapse();
 
-      if (this.scene === 'overworld') for (const a of this.overworld.animals) updateAnimal(a, dt, this.overworld.penBounds);
+      if (this.scene === 'overworld') {
+        for (const a of this.overworld.animals) updateAnimal(a, dt, this.overworld.penBounds);
+        for (const vil of this.overworld.villagers) updateVillager(vil, dt, (x, y, w, h) => this.blocked(x, y, w, h));
+      }
       this.combat.updateEnemies(dt);
       this.combat.updateEffects(dt);
       this._updateGroundPickup();
@@ -784,6 +871,12 @@ export class Game {
         if (pl && pl.cropId && pl.stage >= 3) fx.addLight(gx * TILE + 16 - cam.x, gy * TILE + 13 - cam.y, 26, '255,240,150', 0.4);
       }
       if (this._firefliesActive()) for (const f of this.effects.fireflies) fx.addLight(f.x, f.y, 22, '200,255,140', 0.5 + Math.sin(f.ph) * 0.4);
+      // fenêtres allumées la nuit (village cosy)
+      if (night) for (const b of ow.buildings) {
+        const wy = (b.y + b.h - 1) * TILE + 16 - cam.y;
+        fx.addLight(b.x * TILE + 16 - cam.x, wy, 44, '255,190,90', 0.5);
+        fx.addLight((b.x + b.w - 1) * TILE + 16 - cam.x, wy, 44, '255,190,90', 0.5);
+      }
     } else if (this.mine && this.mine.boss) {
       const b = this.mine.boss;
       fx.addLight(b.x - cam.x, b.y - cam.y, 60, b.kind === 'boss_gigaslime' ? '180,80,220' : '255,90,60', 0.5);
@@ -802,6 +895,7 @@ export class Game {
     this.particles.draw(ctx, this.camera);
     this._renderAmbient();
     this._renderPlacementPreview();
+    this._renderAimHighlight();
     this._renderWeather();
     // 2) obscurité (masque de visibilité)
     this._renderNight();
@@ -815,6 +909,11 @@ export class Game {
     this._renderFloatTexts();
     this.postfx.grain(ctx, 0.04);
     this.postfx.vignette(ctx, 0.32);
+  }
+
+  _roofColorAt(gx, gy) {
+    for (const b of this.overworld.buildings) if (b.y === gy && gx >= b.x && gx < b.x + b.w) return b.roof;
+    return '#8a3a34';
   }
 
   _renderClouds() {
@@ -870,7 +969,7 @@ export class Game {
       else if (t === OT.PATH) Sprites.path(ctx, x, y, v, edgeMask(gx, gy, OT.PATH, false), gx, gy);
       else if (t === OT.FARMLAND) { const pl = ow.farmland[gx + ',' + gy]; Sprites.farmland(ctx, x, y, pl && pl.watered); }
       else Sprites.grass(ctx, x, y, v, season, gx, gy);
-      if (t === OT.WALL) Sprites.wall(ctx, x, y, T.get(gx, gy - 1) !== OT.WALL);
+      if (t === OT.WALL) Sprites.wall(ctx, x, y, T.get(gx, gy - 1) !== OT.WALL, this._roofColorAt(gx, gy));
       else if (t === OT.BED) Sprites.bed(ctx, x, y);
       else if (t === OT.QUESTBOARD) Sprites.questBoard(ctx, x, y);
       else if (t === OT.SHOPCOUNTER) Sprites.shopCounter(ctx, x, y);
@@ -909,6 +1008,7 @@ export class Game {
       } });
     }
     drawables.push({ y: this.shopPos.y, fn: () => Sprites.shopkeeper(ctx, this.shopPos.x - cam.x, this.shopPos.y - cam.y - 14) });
+    for (const vil of ow.villagers) drawables.push({ y: vil.y, fn: () => Sprites.villager(ctx, vil.x - cam.x, vil.y - cam.y, vil) });
     for (const a of ow.animals) drawables.push({ y: a.y, fn: () => (a.kind === 'chicken' ? Sprites.chicken : Sprites.cow)(ctx, a.x - cam.x, a.y - cam.y, a) });
     for (const g of ow.ground) drawables.push({ y: g.y, fn: () => this._drawGround(g) });
     drawables.push({ y: this.player.y + this.player.h, fn: () => this._drawPlayer() });
@@ -981,6 +1081,38 @@ export class Game {
     ctx.fillRect(x, y, TILE, TILE);
     ctx.strokeStyle = valid ? '#5f5' : '#f55'; ctx.lineWidth = 2;
     ctx.strokeRect(x + 1, y + 1, TILE - 2, TILE - 2);
+  }
+
+  // Réticule sur la tuile visée (outils de terrain / graines), vert=valide.
+  _renderAimHighlight() {
+    if (this.anyModalOpen() || this.faint) return;
+    const sel = this.inventory.selectedItem;
+    if (!sel) return;
+    const it = ITEMS[sel.id];
+    if (!(it.type === 'seed' || (it.type === 'tool' && it.tool !== 'sword'))) return;
+    const { gx, gy } = this.aimTile();
+    let valid = false;
+    if (this.scene === 'overworld') {
+      const t = this.overworld.tilemap.get(gx, gy);
+      const plot = this.overworld.farmland[gx + ',' + gy];
+      if (it.type === 'seed') valid = !!(plot && plot.tilled && !plot.cropId);
+      else if (it.tool === 'hoe') valid = t === OT.GRASS;
+      else if (it.tool === 'water') valid = t === OT.FARMLAND;
+      else if (it.tool === 'axe') valid = t === OT.TREE;
+      else if (it.tool === 'pickaxe') valid = t === OT.ROCK;
+    } else if (it.tool === 'pickaxe' || it.tool === 'axe') {
+      const t = this.mine.tilemap.get(gx, gy);
+      valid = t === MT.WALL || TileMap.isOreMine(t);
+    }
+    const x = gx * TILE - this.camera.x, y = gy * TILE - this.camera.y, ctx = this.ctx;
+    ctx.save();
+    ctx.strokeStyle = valid ? 'rgba(255,255,255,0.9)' : 'rgba(255,110,110,0.7)';
+    ctx.lineWidth = 2; ctx.setLineDash([5, 4]);
+    ctx.lineDashOffset = (this.globalT * 8) % 9;
+    ctx.strokeRect(x + 2, y + 2, TILE - 4, TILE - 4);
+    ctx.setLineDash([]);
+    if (valid) { ctx.fillStyle = 'rgba(255,255,255,0.08)'; ctx.fillRect(x + 2, y + 2, TILE - 4, TILE - 4); }
+    ctx.restore();
   }
 
   _renderFloatTexts() {

@@ -19,7 +19,7 @@ export class FarmingSystem {
 
   useTool(tool) {
     const g = this.game, p = g.player;
-    const f = p.frontTile();
+    const f = g.aimTile(); // tuile visée à la souris (2 cases max)
 
     if (tool === 'sword') { g.combat.swingSword(); return; }
 
@@ -122,7 +122,7 @@ export class FarmingSystem {
   plantSeed(seedId) {
     const g = this.game;
     if (g.scene !== 'overworld') { g.toast('On ne plante pas dans la mine.'); return false; }
-    const f = g.player.frontTile();
+    const f = g.aimTile();
     const plot = g.overworld.farmland[f.gx + ',' + f.gy];
     if (!plot || !plot.tilled) { g.toast("Labourez d'abord la terre."); return false; }
     if (plot.cropId) { g.toast('Cette parcelle est déjà plantée.'); return false; }

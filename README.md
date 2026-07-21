@@ -31,6 +31,8 @@ Le jeu existe aussi en un **unique `public/classic.html`** ouvrable directement 
 ## 🕹️ Fonctionnalités
 
 - **Monde & zones** : ferme, village (boutique + panneau de quêtes) et entrée de mine, caméra à défilement fluide, collisions strictes.
+- **Village vivant** : plusieurs maisons aux toits colorés et des **habitants (PNJ)** regroupés en foyers (seul, couple, famille, aîné) qui déambulent avec une IA simple, se tournent vers vous et **vous saluent** ; fenêtres allumées la nuit.
+- **Ciblage à la souris** : labourer, arroser, planter, miner et construire **sur la tuile pointée par le curseur** (le joueur se tourne vers elle), jusqu'à **2 cases** de portée, avec réticule de visée vert/rouge.
 - **Cycle jour/nuit** en temps réel (06:00 → 02:00), teinte d'ambiance progressive et halo de lumière autour du joueur et des torches.
 - **Saisons & météo** : 4 saisons (28 jours chacune) qui conditionnent les cultures plantables ; météo dynamique (soleil, pluie qui arrose les champs, neige, et **éclipse maniaque** qui renforce les ennemis).
 - **Survie** : jauges de Santé, Énergie, Faim, or à gagner/dépenser ; évanouissement et réveil le lendemain avec perte d'or.

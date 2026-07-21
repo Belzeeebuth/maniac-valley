@@ -21,7 +21,11 @@ export class InputHandler {
       this.mouse.y = e.clientY - r.top;
     });
     canvas.addEventListener('mousedown', (e) => {
-      if (e.button === 0) { this.mouse.down = true; if (this._onPrimary) this._onPrimary(); }
+      if (e.button === 0) {
+        const r = canvas.getBoundingClientRect();
+        this.mouse.x = e.clientX - r.left; this.mouse.y = e.clientY - r.top;
+        this.mouse.down = true; if (this._onPrimary) this._onPrimary();
+      }
     });
     window.addEventListener('mouseup', () => { this.mouse.down = false; });
     canvas.addEventListener('contextmenu', (e) => e.preventDefault());

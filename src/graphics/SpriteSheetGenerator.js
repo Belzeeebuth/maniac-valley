@@ -192,16 +192,18 @@ export const Sprites = {
   },
 
   // Mur / maison avec toit de tuiles sur la rangée supérieure.
-  wall(c, x, y, roof) {
+  wall(c, x, y, roof, roofCol) {
     if (roof) {
-      // toit en tuiles
-      rect(c, x, y, TILE, TILE, '#8a3a34');
-      c.fillStyle = '#a24842';
-      for (let r = 0; r < 2; r++) for (let cc = (r % 2) * 8; cc < TILE; cc += 16) rect(c, x + cc, y + r * 10, 14, 8, '#a24842');
-      c.fillStyle = '#6f2a26';
-      for (let r = 0; r <= 2; r++) rect(c, x, y + r * 10 - 1, TILE, 2);
-      rect(c, x, y, TILE, 3, '#c25c54'); // faîtage clair
-      rect(c, x, y + TILE - 4, TILE, 4, '#5a201d'); // avant-toit ombré
+      const base = roofCol || '#8a3a34';
+      // toit en tuiles (teintes dérivées de la couleur de base)
+      rect(c, x, y, TILE, TILE, base);
+      c.globalAlpha = 0.35; c.fillStyle = '#ffffff';
+      for (let r = 0; r < 2; r++) for (let cc = (r % 2) * 8; cc < TILE; cc += 16) c.fillRect(x + cc, y + r * 10, 14, 8);
+      c.globalAlpha = 0.35; c.fillStyle = '#000000';
+      for (let r = 0; r <= 2; r++) c.fillRect(x, y + r * 10 - 1, TILE, 2);
+      c.globalAlpha = 1;
+      c.fillStyle = 'rgba(255,255,255,0.4)'; c.fillRect(x, y, TILE, 3);       // faîtage clair
+      c.fillStyle = 'rgba(0,0,0,0.35)'; c.fillRect(x, y + TILE - 4, TILE, 4); // avant-toit ombré
       return;
     }
     // mur en rondins/plâtre
@@ -526,6 +528,41 @@ export const Sprites = {
       }
     }
     c.restore();
+  },
+
+  villager(c, sx, sy, v) {
+    const child = v.kind === 'child';
+    const w = child ? 14 : 18, hgt = child ? 15 : 20;
+    const bob = Math.sin(v.animT * (child ? 7 : 5)) * (v.talkT > 0 ? 0 : 1.3);
+    shadow(c, sx, sy + hgt / 2 + 3, child ? 8 : 10, 3);
+    const x0 = sx - w / 2, y0 = sy - hgt / 2 + bob;
+    // jambes
+    rect(c, x0 + 3, y0 + hgt - 6, 4, 6, '#3a3550'); rect(c, x0 + w - 7, y0 + hgt - 6, 4, 6, '#3a3550');
+    // corps (chemise)
+    rect(c, x0 + 1, y0 + hgt - 15, w - 2, 11, v.shirt);
+    rect(c, x0 + 1, y0 + hgt - 15, 3, 11, 'rgba(0,0,0,0.18)');
+    // bras
+    rect(c, x0 - 1, y0 + hgt - 14, 3, 8, v.shirt); rect(c, x0 + w - 2, y0 + hgt - 14, 3, 8, v.shirt);
+    // tête
+    rect(c, x0 + 3, y0 + hgt - 26, w - 6, 12, v.skin);
+    rect(c, x0 + 3, y0 + hgt - 26, 2, 12, 'rgba(0,0,0,0.12)');
+    // cheveux selon orientation
+    if (v.facing === 'up') rect(c, x0 + 2, y0 + hgt - 28, w - 4, 8, v.hair);
+    else {
+      rect(c, x0 + 2, y0 + hgt - 28, w - 4, 5, v.hair);
+      c.fillStyle = '#2a2018';
+      if (v.facing === 'down') { rect(c, x0 + 5, y0 + hgt - 20, 2, 2); rect(c, x0 + w - 7, y0 + hgt - 20, 2, 2); }
+      else if (v.facing === 'left') rect(c, x0 + 4, y0 + hgt - 20, 2, 2);
+      else rect(c, x0 + w - 6, y0 + hgt - 20, 2, 2);
+    }
+    // bulle de dialogue
+    if (v.talkT > 0) {
+      const bx = sx + 8, by = sy - hgt / 2 - 8;
+      c.fillStyle = 'rgba(255,255,255,0.92)';
+      c.beginPath(); c.arc(bx, by, 5, 0, Math.PI * 2); c.fill();
+      c.beginPath(); c.moveTo(bx - 4, by + 3); c.lineTo(bx - 2, by + 8); c.lineTo(bx, by + 3); c.fill();
+      c.fillStyle = '#3a2a18'; rect(c, bx - 2.5, by - 1, 5, 1.5); rect(c, bx - 2.5, by + 1.5, 3, 1.5);
+    }
   },
 
   shopkeeper(c, sx, sy) {
