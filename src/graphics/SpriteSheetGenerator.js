@@ -383,6 +383,38 @@ export const Sprites = {
       c.beginPath(); c.moveTo(x + 22, y + 6); c.lineTo(x + 18, y + 14); c.stroke();
     }
   },
+  // Gouffre : trou sombre avec rebord — infranchissable sans passerelle.
+  pit(c, x, y, biome = null) {
+    const face = biome ? biome.floorA : '#43392f';
+    rect(c, x, y, TILE, TILE, face);
+    rect(c, x + 2, y + 3, TILE - 4, TILE - 5, '#08060a');
+    rect(c, x + 2, y + 3, TILE - 4, 3, '#000');
+    c.fillStyle = 'rgba(255,255,255,0.07)'; c.fillRect(x + 2, y + TILE - 3, TILE - 4, 1);
+    c.fillStyle = 'rgba(0,0,0,0.5)'; c.fillRect(x + 4, y + 6, 5, 2); c.fillRect(x + 20, y + 9, 6, 2);
+  },
+  // Passerelle en planches (sur gouffre ou sur l'eau)
+  bridge(c, x, y, overWater = false) {
+    if (!overWater) { rect(c, x, y, TILE, TILE, '#08060a'); }
+    rect(c, x, y + 2, TILE, TILE - 4, '#8a6238');
+    c.fillStyle = '#a8825a';
+    for (let i = 0; i < TILE; i += 8) c.fillRect(x + i, y + 2, 6, TILE - 4);
+    c.fillStyle = 'rgba(0,0,0,0.25)';
+    for (let i = 6; i < TILE; i += 8) c.fillRect(x + i, y + 2, 2, TILE - 4);
+    rect(c, x, y + 1, TILE, 2, '#6b4a2b'); rect(c, x, y + TILE - 3, TILE, 2, '#6b4a2b');
+  },
+  // Buisson à baies (bosquet)
+  bush(c, x, y, ready) {
+    shadow(c, x + 16, y + 27, 13, 4);
+    circ(c, x + 16, y + 18, 12, '#2f6b33');
+    circ(c, x + 9, y + 21, 8, '#2a5f2e');
+    circ(c, x + 23, y + 21, 8, '#2a5f2e');
+    circ(c, x + 16, y + 13, 9, '#3a7f3e');
+    c.fillStyle = '#4a9a4e'; circ(c, x + 12, y + 12, 3, '#4a9a4e'); circ(c, x + 20, y + 15, 2.5, '#4a9a4e');
+    if (ready) {
+      const spots = [[10, 16], [16, 20], [22, 14], [14, 24], [21, 22], [16, 11]];
+      for (const [bx, by] of spots) { circ(c, x + bx, y + by, 2.2, '#d43a5a'); circ(c, x + bx - 0.7, y + by - 0.7, 0.8, '#ff8aa0'); }
+    }
+  },
   mineOre(c, x, y, kind, biome = null) {
     Sprites.mineWall(c, x, y, biome);
     const P = { copper: ['#c9743a', '#e0985a'], iron: ['#b6b6c6', '#dcdcea'], gold: ['#e6b820', '#ffe680'], diamond: ['#5fd8cf', '#bff5f0'] }[kind];
@@ -733,6 +765,8 @@ const ICON = {
   fish_carp(c, s) { c.fillStyle = '#b8935a'; c.beginPath(); c.ellipse(s * .48, s * .55, s * .3, s * .18, -0.15, 0, Math.PI * 2); c.fill(); c.fillStyle = '#93703a'; c.beginPath(); c.moveTo(s * .74, s * .5); c.lineTo(s * .9, s * .38); c.lineTo(s * .9, s * .66); c.closePath(); c.fill(); icc(c, s * .3, s * .5, s * .03, '#111'); },
   fish_trout(c, s) { c.fillStyle = '#7a9ac4'; c.beginPath(); c.ellipse(s * .48, s * .55, s * .3, s * .16, -0.2, 0, Math.PI * 2); c.fill(); c.fillStyle = '#e88aa0'; ir(c, s * .3, s * .5, s * .34, s * .05); c.fillStyle = '#5a7aa4'; c.beginPath(); c.moveTo(s * .74, s * .5); c.lineTo(s * .9, s * .38); c.lineTo(s * .9, s * .66); c.closePath(); c.fill(); icc(c, s * .3, s * .5, s * .03, '#111'); },
   fish_king(c, s) { c.fillStyle = '#e0bc30'; c.beginPath(); c.ellipse(s * .48, s * .58, s * .3, s * .18, -0.15, 0, Math.PI * 2); c.fill(); c.fillStyle = '#a8871a'; c.beginPath(); c.moveTo(s * .74, s * .53); c.lineTo(s * .9, s * .4); c.lineTo(s * .9, s * .7); c.closePath(); c.fill(); c.fillStyle = '#ffd700'; c.beginPath(); c.moveTo(s * .34, s * .34); c.lineTo(s * .4, s * .2); c.lineTo(s * .46, s * .32); c.lineTo(s * .52, s * .2); c.lineTo(s * .58, s * .34); c.closePath(); c.fill(); icc(c, s * .32, s * .54, s * .03, '#111'); },
+  berry(c, s) { icc(c, s * .38, s * .5, s * .14, '#d43a5a'); icc(c, s * .6, s * .45, s * .14, '#c42a4a'); icc(c, s * .5, s * .65, s * .14, '#e44a6a'); c.fillStyle = 'rgba(255,255,255,0.5)'; icc(c, s * .35, s * .46, s * .04, 'rgba(255,255,255,0.6)'); ir(c, s * .46, s * .25, s * .08, s * .14, '#3a8a3a'); },
+  bridge_item(c, s) { ir(c, s * .15, s * .3, s * .7, s * .4, '#8a6238'); c.fillStyle = '#a8825a'; for (let i = 0; i < 4; i++) ir(c, s * (.17 + i * .17), s * .3, s * .12, s * .4, '#a8825a'); ir(c, s * .15, s * .28, s * .7, s * .05, '#6b4a2b'); ir(c, s * .15, s * .67, s * .7, s * .05, '#6b4a2b'); },
   seed_carrot(c, s) { ir(c, s * .32, s * .3, s * .36, s * .42, '#c8a86a'); icc(c, s * .5, s * .28, s * .1, '#e8760f'); },
   seed_corn(c, s) { ir(c, s * .32, s * .3, s * .36, s * .42, '#c8a86a'); icc(c, s * .5, s * .28, s * .1, '#f2d94e'); },
   seed_blueberry(c, s) { ir(c, s * .32, s * .3, s * .36, s * .42, '#c8a86a'); icc(c, s * .5, s * .28, s * .1, '#4a5fc4'); },

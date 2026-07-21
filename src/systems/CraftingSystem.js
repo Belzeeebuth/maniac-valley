@@ -13,6 +13,7 @@ export const RECIPES = [
   { id: 'scarecrow', name: 'Épouvantail',        cat: 'build', cost: { wood: 20, stone: 5 },   result: 'scarecrow_item', qty: 1 },
   { id: 'torch',     name: 'Torches (x3)',       cat: 'build', cost: { wood: 2, coal: 1 },     result: 'torch_item',     qty: 3 },
   { id: 'fishingrod', name: 'Canne à pêche',     cat: 'build', cost: { wood: 8, copper: 2 },   result: 'fishingrod',     qty: 1 },
+  { id: 'bridge',     name: 'Passerelles (x2)',  cat: 'build', cost: { wood: 4 },              result: 'bridge_item',    qty: 2 },
 
   { id: 'bar_copper', name: 'Lingot de Cuivre', cat: 'forge', cost: { copper: 3, coal: 1 },   result: 'bar_copper', qty: 1, needFurnace: true },
   { id: 'bar_iron',   name: 'Lingot de Fer',    cat: 'forge', cost: { iron: 3, coal: 2 },     result: 'bar_iron',   qty: 1, needFurnace: true },

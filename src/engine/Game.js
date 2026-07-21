@@ -342,6 +342,18 @@ export class Game {
       }
       const f = this.aimTile();
       if (isReady(this.overworld.farmland[f.gx + ',' + f.gy])) { this.farming.harvest(f.gx, f.gy); return true; }
+      // buissons à baies du bosquet
+      const bush = this.overworld.bushes[f.gx + ',' + f.gy];
+      if (bush && this.overworld.tilemap.get(f.gx, f.gy) === OT.BUSH) {
+        if (bush.ready) {
+          const n = 1 + (Math.random() < 0.4 ? 1 : 0);
+          this.inventory.add('berry', n); this.loot('berry', n);
+          bush.ready = false; bush.regrowDay = this.time.day + 2 + (Math.random() * 2 | 0);
+          this.sound.play('pickup');
+          this.particles.sparkle(f.wx, f.wy - 8, '#e84a6a', 6);
+        } else this.toast('Les baies repoussent...');
+        return true;
+      }
     } else {
       const m = this.mine;
       const stx = m.stairsPos.x * TILE + TILE / 2, sty = m.stairsPos.y * TILE + TILE / 2;
@@ -350,7 +362,12 @@ export class Game {
         this.enterMine(m.level + 1); return true;
       }
       const ex = m.entrance.x * TILE + TILE / 2, ey = m.entrance.y * TILE + TILE / 2;
-      if (dist(cx, cy, ex, ey) < TILE * 1.2) { this.exitMine(); return true; }
+      if (dist(cx, cy, ex, ey) < TILE * 1.2) {
+        // remonter d'un étage à la fois ; étage 1 → surface
+        if (m.level === 1) this.exitMine();
+        else this.enterMine(m.level - 1);
+        return true;
+      }
     }
     return false;
   }
@@ -371,6 +388,8 @@ export class Game {
       }
       const f = this.aimTile();
       if (isReady(this.overworld.farmland[f.gx + ',' + f.gy])) return 'Clic : Récolter';
+      const bush = this.overworld.bushes[f.gx + ',' + f.gy];
+      if (bush && this.overworld.tilemap.get(f.gx, f.gy) === OT.BUSH) return bush.ready ? 'Clic : Cueillir des baies' : 'Les baies repoussent...';
     } else {
       const m = this.mine;
       const stx = m.stairsPos.x * TILE + TILE / 2, sty = m.stairsPos.y * TILE + TILE / 2;
@@ -386,8 +405,15 @@ export class Game {
   placementValid(gx, gy) {
     const s = this.curScene(), t = s.tilemap.get(gx, gy);
     if (t === -1) return false;
-    if (this.scene === 'overworld') { if (t !== OT.GRASS && t !== OT.PATH) return false; }
-    else if (t !== MT.FLOOR) return false;
+    const sel = this.inventory.selectedItem;
+    const placeType = sel && ITEMS[sel.id] ? ITEMS[sel.id].placeType : null;
+    if (placeType === 'bridge') {
+      // les passerelles se posent SUR les gouffres (mine) ou l'eau (surface)
+      if (this.scene === 'overworld' ? t !== OT.WATER : t !== MT.PIT) return false;
+    } else {
+      if (this.scene === 'overworld') { if (t !== OT.GRASS && t !== OT.PATH) return false; }
+      else if (t !== MT.FLOOR) return false;
+    }
     for (const o of s.placed) if (o.gx === gx && o.gy === gy) return false;
     const pgx = Math.floor(this.player.cx / TILE), pgy = Math.floor(this.player.cy / TILE);
     if (Math.abs(gx - pgx) > 2 || Math.abs(gy - pgy) > 2) return false;
@@ -397,12 +423,15 @@ export class Game {
     const { gx, gy } = this.placementCell();
     if (!this.placementValid(gx, gy)) { this.toast('Emplacement invalide.'); return; }
     const it = ITEMS[sel.id], s = this.curScene();
-    s.placed.push({ gx, gy, type: it.placeType });
-    if (it.placeType === 'fence' && this.scene === 'overworld') s.tilemap.set(gx, gy, OT.FENCE);
+    if (it.placeType === 'bridge') {
+      s.tilemap.set(gx, gy, this.scene === 'overworld' ? OT.BRIDGE : MT.BRIDGE);
+    } else {
+      s.placed.push({ gx, gy, type: it.placeType });
+      if (it.placeType === 'fence' && this.scene === 'overworld') s.tilemap.set(gx, gy, OT.FENCE);
+    }
     this.inventory.remove(sel.id, 1);
     this.sound.play('place');
-    this.toast(it.name + ' placé.');
-    this.hud.renderHotbar();
+    this.toast(it.name + ' placé' + (it.placeType === 'bridge' ? 'e' : '') + '.');
   }
 
   eatItem(id) {
@@ -429,6 +458,7 @@ export class Game {
     }
     for (const key in ow.treeTimers) if (ow.treeTimers[key] <= this.time.day) { const [x, y] = key.split(',').map(Number); ow.tilemap.set(x, y, OT.TREE); delete ow.treeTimers[key]; }
     for (const key in ow.rockTimers) if (ow.rockTimers[key] <= this.time.day) { const [x, y] = key.split(',').map(Number); ow.tilemap.set(x, y, OT.ROCK); delete ow.rockTimers[key]; }
+    for (const key in ow.bushes) { const b = ow.bushes[key]; if (!b.ready && b.regrowDay <= this.time.day) b.ready = true; }
     this.time.rollWeather();
     this._initWeatherParticles();
     this._initAmbient();
@@ -497,6 +527,13 @@ export class Game {
     }
     this.particles.update(dt);
     this.saves.update(dt);
+
+    // L'inventaire a changé → rafraîchir la hotbar (et le sac s'il est ouvert)
+    if (this.inventory.dirty) {
+      this.inventory.dirty = false;
+      this.hud.renderHotbar();
+      if (this.modals.inventory) this.inventoryUI.render();
+    }
 
     this.camera.follow(this.player, this.curScene().w, this.curScene().h, this.canvas.width, this.canvas.height, dt);
     this._updateFloatTexts(dt);

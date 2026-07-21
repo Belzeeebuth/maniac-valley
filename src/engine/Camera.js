@@ -14,12 +14,15 @@ export class Camera {
   }
 
   _clampTarget(target, sceneW, sceneH, viewW, viewH) {
-    const maxX = Math.max(0, sceneW * TILE - viewW);
-    const maxY = Math.max(0, sceneH * TILE - viewH);
-    return {
-      x: Math.min(Math.max(target.x + target.w / 2 - viewW / 2, 0), maxX),
-      y: Math.min(Math.max(target.y + target.h / 2 - viewH / 2, 0), maxY),
-    };
+    const worldW = sceneW * TILE, worldH = sceneH * TILE;
+    // Scène plus petite que l'écran (petites mines) → centrée, pas en haut-gauche.
+    const x = worldW <= viewW
+      ? (worldW - viewW) / 2
+      : Math.min(Math.max(target.x + target.w / 2 - viewW / 2, 0), worldW - viewW);
+    const y = worldH <= viewH
+      ? (worldH - viewH) / 2
+      : Math.min(Math.max(target.y + target.h / 2 - viewH / 2, 0), worldH - viewH);
+    return { x, y };
   }
 
   follow(target, sceneW, sceneH, viewW, viewH, dt) {

@@ -72,7 +72,7 @@ export class RenderManager {
     for (let gy = sy0; gy < sy1; gy++) for (let gx = sx0; gx < sx1; gx++) {
       const t = T.get(gx, gy);
       const x = gx * TILE - cam.x, y = gy * TILE - cam.y, v = (gx * 7 + gy * 13) % 9;
-      if (t === OT.WATER) Sprites.water(ctx, x, y, g.globalT, edgeMask(gx, gy, OT.WATER, true), gx, gy);
+      if (t === OT.WATER || t === OT.BRIDGE) Sprites.water(ctx, x, y, g.globalT, edgeMask(gx, gy, OT.WATER, true), gx, gy);
       else if (t === OT.PATH) Sprites.path(ctx, x, y, v, edgeMask(gx, gy, OT.PATH, false), gx, gy);
       else if (t === OT.FARMLAND) { const pl = ow.farmland[gx + ',' + gy]; CachedTiles.farmland(ctx, x, y, !!(pl && pl.watered)); }
       else CachedTiles.grass(ctx, x, y, season, gx, gy);
@@ -83,6 +83,8 @@ export class RenderManager {
       else if (t === OT.MINE_ENTRANCE) Sprites.mineEntrance(ctx, x, y);
       else if (t === OT.FENCE) CachedTiles.fence(ctx, x, y);
       else if (t === OT.ROCK) CachedTiles.rock(ctx, x, y);
+      else if (t === OT.BUSH) { const b = ow.bushes[gx + ',' + gy]; Sprites.bush(ctx, x, y, !!(b && b.ready)); }
+      else if (t === OT.BRIDGE) Sprites.bridge(ctx, x, y, true);
       else if (t === OT.FARMLAND) { const pl = ow.farmland[gx + ',' + gy]; if (pl && pl.cropId) Sprites.cropStage(ctx, x, y, pl.cropId, pl.stage); }
     }
 
@@ -137,6 +139,8 @@ export class RenderManager {
       else if (t === MT.ORE_DIAMOND) CachedTiles.mineOre(ctx, x, y, 'diamond', biome, bk);
       else if (t === MT.STAIRS || t === MT.STAIRS_SEALED) { CachedTiles.mineFloor(ctx, x, y, biome, bk, gx, gy); Sprites.stairsDown(ctx, x, y, t === MT.STAIRS_SEALED); }
       else if (t === MT.ENTRANCE) Sprites.mineEntranceTile(ctx, x, y, gx, gy, biome);
+      else if (t === MT.PIT) Sprites.pit(ctx, x, y, biome);
+      else if (t === MT.BRIDGE) Sprites.bridge(ctx, x, y, false);
       else CachedTiles.mineFloor(ctx, x, y, biome, bk, gx, gy);
     }
     // pièges

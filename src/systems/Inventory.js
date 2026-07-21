@@ -52,6 +52,9 @@ export const ITEMS = {
   crop_corn:       { name: 'Maïs',       type: 'crop', cropId: 'corn',       stack: 99, sell: CROPS.corn.sell,       rarity: 'rare',   food: CROPS.corn.food },
   crop_blueberry:  { name: 'Myrtille',   type: 'crop', cropId: 'blueberry',  stack: 99, sell: CROPS.blueberry.sell,  rarity: 'rare',   food: CROPS.blueberry.food },
 
+  // Cueillette
+  berry: { name: 'Baies sauvages', type: 'crop', stack: 99, sell: 6, rarity: 'common', food: { hunger: 8, hp: 2, stam: 4 }, desc: 'Cueillies dans le bosquet du sud.' },
+
   // Poissons (pêche)
   fish_perch: { name: 'Perche',       type: 'fish', stack: 99, sell: 18, rarity: 'common', food: { hunger: 16, hp: 4, stam: 8 } },
   fish_carp:  { name: 'Carpe',        type: 'fish', stack: 99, sell: 14, rarity: 'common', food: { hunger: 14, hp: 3, stam: 6 } },
@@ -72,6 +75,7 @@ export const ITEMS = {
   furnace_item:   { name: 'Fourneau',    type: 'placeable', placeType: 'furnace',   stack: 99, rarity: 'rare' },
   scarecrow_item: { name: 'Épouvantail', type: 'placeable', placeType: 'scarecrow', stack: 99, rarity: 'common' },
   torch_item:     { name: 'Torche',      type: 'placeable', placeType: 'torch',     stack: 99, rarity: 'common' },
+  bridge_item:    { name: 'Passerelle',  type: 'placeable', placeType: 'bridge',    stack: 99, rarity: 'common', desc: 'Franchit gouffres et rivières.' },
 
   // Améliorations (résultat de craft "upgrade")
   sword_upgrade:   { name: "Amélioration d'Épée",   type: 'upgrade_token', upgrade: 'sword',   stack: 99, rarity: 'maniac' },
@@ -99,6 +103,7 @@ export class Inventory {
     this.hotbar = new Array(10).fill(null);
     this.backpack = new Array(32).fill(null);
     this.selected = 0;
+    this.dirty = false; // levé à chaque mutation → le HUD se rafraîchit
   }
 
   get selectedItem() { return this.hotbar[this.selected]; }
@@ -121,6 +126,7 @@ export class Inventory {
     const max = ITEMS[id].stack || 99;
     qty = this._addToArray(this.hotbar, id, qty, max);
     qty = this._addToArray(this.backpack, id, qty, max);
+    this.dirty = true;
     return qty <= 0;
   }
 
@@ -133,6 +139,12 @@ export class Inventory {
 
   remove(id, qty) {
     let need = qty;
+    // le stack sélectionné en premier : le compteur visible baisse là où on agit
+    const sel = this.hotbar[this.selected];
+    if (sel && sel.id === id && need > 0) {
+      const take = Math.min(sel.count, need); sel.count -= take; need -= take;
+      if (sel.count <= 0) this.hotbar[this.selected] = null;
+    }
     const eat = (arr) => {
       for (let i = 0; i < arr.length && need > 0; i++) {
         const s = arr[i];
@@ -143,6 +155,7 @@ export class Inventory {
       }
     };
     eat(this.hotbar); eat(this.backpack);
+    this.dirty = true;
     return need <= 0;
   }
 
@@ -153,6 +166,7 @@ export class Inventory {
     const t = this.hotbar[hotbarIndex];
     this.hotbar[hotbarIndex] = this.backpack[backpackIndex];
     this.backpack[backpackIndex] = t;
+    this.dirty = true;
   }
 
   sellableIds() {

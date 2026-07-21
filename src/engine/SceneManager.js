@@ -131,6 +131,33 @@ export class SceneManager {
     spawnFoyer(h5, ['adult', 'adult']);
     spawnFoyer(h6, ['adult', 'adult', 'child']);
 
+    // Bosquet aux Baies (prairie sud, jusqu'ici vide) : buissons à baies
+    // cueillables qui repoussent, étang de pêche, arbres et fleurs.
+    const bushes = {};
+    {
+      const zx1 = 12, zy1 = 24, zx2 = 26, zy2 = 38;
+      // étang
+      const pcx = 19, pcy = 30;
+      for (let y = pcy - 2; y <= pcy + 2; y++) for (let x = pcx - 3; x <= pcx + 3; x++) {
+        const d = Math.hypot(x - pcx, y - pcy);
+        if (d < 2.6 && grid[y] && grid[y][x] === OT.GRASS) grid[y][x] = OT.WATER;
+      }
+      // buissons à baies
+      let placedBush = 0;
+      for (let tries = 0; tries < 200 && placedBush < 14; tries++) {
+        const x = ri(zx1, zx2), y = ri(zy1, zy2);
+        if (grid[y][x] !== OT.GRASS) continue;
+        grid[y][x] = OT.BUSH;
+        bushes[x + ',' + y] = { ready: true, regrowDay: 0 };
+        placedBush++;
+      }
+      // arbres supplémentaires pour densifier le bosquet
+      for (let tries = 0; tries < 60; tries++) {
+        const x = ri(zx1, zx2), y = ri(zy1, zy2);
+        if (grid[y][x] === OT.GRASS && Math.random() < 0.3) grid[y][x] = OT.TREE;
+      }
+    }
+
     // Entrée de mine
     const mx = 42, my = 32;
     for (let y = my - 2; y <= my + 2; y++) for (let x = mx - 3; x <= mx + 3; x++)
@@ -145,7 +172,7 @@ export class SceneManager {
 
     return {
       tilemap: new TileMap(grid, 'overworld'), w: OW_W, h: OW_H,
-      farmland, animals, penBounds, placed: [], ground: [], buildings, villagers,
+      farmland, animals, penBounds, placed: [], ground: [], buildings, villagers, bushes,
       treeHp: {}, rockHp: {}, treeTimers: {}, rockTimers: {},
     };
   }

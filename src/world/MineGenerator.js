@@ -48,8 +48,9 @@ export function generateMine(level) {
   carve(entrance.x, entrance.y, 900);
   for (let i = 0; i < 6; i++) carve(ri(3, MINE_W - 4), ri(3, MINE_H - 4), 260);
 
-  // BFS depuis l'entrée → tuile la plus éloignée pour l'escalier
+  // BFS depuis l'entrée (avec parents pour protéger le chemin vers l'escalier)
   const dist = makeGrid(MINE_W, MINE_H, -1);
+  const prev = makeGrid(MINE_W, MINE_H, null);
   dist[entrance.y][entrance.x] = 0;
   const q = [[entrance.x, entrance.y]];
   let far = { x: entrance.x, y: entrance.y, d: 0 };
@@ -60,7 +61,7 @@ export function generateMine(level) {
     for (const [nx, ny] of [[x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]]) {
       if (nx < 0 || ny < 0 || nx >= MINE_W || ny >= MINE_H) continue;
       if (grid[ny][nx] !== MT.FLOOR || dist[ny][nx] !== -1) continue;
-      dist[ny][nx] = d + 1; q.push([nx, ny]);
+      dist[ny][nx] = d + 1; prev[ny][nx] = [x, y]; q.push([nx, ny]);
     }
   }
 
@@ -68,28 +69,62 @@ export function generateMine(level) {
   grid[far.y][far.x] = isBoss ? MT.STAIRS_SEALED : MT.STAIRS;
   grid[entrance.y][entrance.x] = MT.ENTRANCE;
 
-  // Veines de minerai sur les murs bordant un sol
-  const depthF = level / MAX_FLOOR;
-  for (let y = 1; y < MINE_H - 1; y++) {
-    for (let x = 1; x < MINE_W - 1; x++) {
-      if (grid[y][x] !== MT.WALL) continue;
-      hp[y][x] = 3;
-      const adj = grid[y][x + 1] === MT.FLOOR || grid[y][x - 1] === MT.FLOOR ||
-                  grid[y + 1][x] === MT.FLOOR || grid[y - 1][x] === MT.FLOOR;
-      if (!adj) continue;
-      const r = Math.random();
-      if (r < 0.04 + depthF * 0.12 && level >= 6) grid[y][x] = MT.ORE_DIAMOND;
-      else if (r < 0.10 + depthF * 0.16 && level >= 4) grid[y][x] = MT.ORE_GOLD;
-      else if (r < 0.20 + depthF * 0.16 && level >= 2) grid[y][x] = MT.ORE_IRON;
-      else if (r < 0.34) grid[y][x] = MT.ORE_COPPER;
-      if (grid[y][x] !== MT.WALL) hp[y][x] = 4;
+  // Chemin protégé entrée → escalier (jamais transformé en gouffre)
+  const protectedPath = new Set();
+  { let cur = [far.x, far.y];
+    while (cur) { protectedPath.add(cur[0] + ',' + cur[1]); cur = prev[cur[1]][cur[0]]; } }
+
+  // Gouffres (étage 4+) : blobs de vide infranchissables — se traversent en
+  // plaçant des Passerelles (construction avec des blocs).
+  if (level >= 4) {
+    const floorList = [...carved].map(s => s.split(',').map(Number));
+    const pitCount = 2 + Math.floor(level / 3);
+    for (let i = 0; i < pitCount; i++) {
+      const seed = choice(floorList);
+      let [x, y] = seed;
+      const size = ri(2, 5);
+      for (let n = 0; n < size; n++) {
+        const key = x + ',' + y;
+        if (grid[y][x] === MT.FLOOR && !protectedPath.has(key) &&
+            !(x === entrance.x && y === entrance.y)) grid[y][x] = MT.PIT;
+        const d = ri(0, 3);
+        if (d === 0) x = clamp(x + 1, 1, MINE_W - 2); else if (d === 1) x = clamp(x - 1, 1, MINE_W - 2);
+        else if (d === 2) y = clamp(y + 1, 1, MINE_H - 2); else y = clamp(y - 1, 1, MINE_H - 2);
+      }
     }
   }
 
-  // Ennemis
+  // Veines de minerai : blobs de 2-6 blocs qui poussent depuis un mur exposé.
+  for (let y = 1; y < MINE_H - 1; y++) for (let x = 1; x < MINE_W - 1; x++)
+    if (grid[y][x] === MT.WALL) hp[y][x] = 3;
+  const exposedWalls = [];
+  for (let y = 1; y < MINE_H - 1; y++) for (let x = 1; x < MINE_W - 1; x++) {
+    if (grid[y][x] !== MT.WALL) continue;
+    if (grid[y][x + 1] === MT.FLOOR || grid[y][x - 1] === MT.FLOOR ||
+        grid[y + 1][x] === MT.FLOOR || grid[y - 1][x] === MT.FLOOR) exposedWalls.push([x, y]);
+  }
+  const growVein = (oreT, count, sizeMin, sizeMax) => {
+    for (let i = 0; i < count && exposedWalls.length; i++) {
+      let [x, y] = choice(exposedWalls);
+      const size = ri(sizeMin, sizeMax);
+      for (let n = 0; n < size; n++) {
+        if (grid[y][x] === MT.WALL) { grid[y][x] = oreT; hp[y][x] = 4; }
+        const opts = [[x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]]
+          .filter(([nx, ny]) => nx >= 1 && ny >= 1 && nx < MINE_W - 1 && ny < MINE_H - 1 && grid[ny][nx] === MT.WALL);
+        if (!opts.length) break;
+        [x, y] = choice(opts);
+      }
+    }
+  };
+  growVein(MT.ORE_COPPER, 5 + (level <= 5 ? 2 : 0), 2, 6);
+  if (level >= 2) growVein(MT.ORE_IRON, 3 + (level / 3 | 0), 2, 5);
+  if (level >= 3) growVein(MT.ORE_GOLD, 2 + (level / 4 | 0), 2, 4);
+  if (level >= 5) growVein(MT.ORE_DIAMOND, 1 + (level / 6 | 0), 1, 3);
+
+  // Ennemis (jamais sur un gouffre)
   const enemies = [];
   const floors = [...carved].map(s => { const [x, y] = s.split(',').map(Number); return { x, y }; })
-    .filter(t => dist[t.y][t.x] > 6);
+    .filter(t => grid[t.y][t.x] === MT.FLOOR && dist[t.y][t.x] > 6);
   const count = 4 + level;
   for (let i = 0; i < count && floors.length; i++) {
     const t = choice(floors);

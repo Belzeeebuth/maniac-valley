@@ -46,6 +46,7 @@ export class SaveManager {
           placed: ow.placed,
           treeHp: ow.treeHp, rockHp: ow.rockHp,
           treeTimers: ow.treeTimers, rockTimers: ow.rockTimers,
+          bushes: ow.bushes,
           animalsFed: ow.animals.map(a => !!a.fed),
         },
       };
@@ -89,6 +90,7 @@ export class SaveManager {
       ow.placed = w.placed || [];
       ow.treeHp = w.treeHp || {}; ow.rockHp = w.rockHp || {};
       ow.treeTimers = w.treeTimers || {}; ow.rockTimers = w.rockTimers || {};
+      if (w.bushes) ow.bushes = w.bushes;
       if (Array.isArray(w.animalsFed)) ow.animals.forEach((a, i) => { a.fed = !!w.animalsFed[i]; });
 
       g.scene = 'overworld';
