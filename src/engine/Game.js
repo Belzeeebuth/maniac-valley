@@ -144,12 +144,14 @@ export class Game {
     }
 
     // Maison
+    const buildings = [];
     const hx = 6, hy = 6, hw = 6, hh = 5;
     for (let y = hy; y < hy + hh; y++) for (let x = hx; x < hx + hw; x++)
       set(x, y, (x === hx || x === hx + hw - 1 || y === hy || y === hy + hh - 1) ? OT.WALL : OT.PATH);
     set(hx + 2, hy + hh - 1, OT.PATH); set(hx + 3, hy + hh - 1, OT.PATH);
     set(hx + 2, hy + 1, OT.BED);
     this.bedPos = { x: (hx + 2) * TILE + TILE / 2, y: (hy + 1) * TILE + TILE / 2 };
+    buildings.push({ x: hx, y: hy, w: hw, h: hh, type: 'home' });
 
     for (let y = hy + hh + 1; y < hy + hh + 9; y++) for (let x = hx - 2; x < hx + 12; x++)
       if (grid[y] && grid[y][x] !== undefined && grid[y][x] !== OT.WATER) grid[y][x] = OT.GRASS;
@@ -181,6 +183,7 @@ export class Game {
     const deco = (bx, by, bw, bh) => {
       for (let y = by; y < by + bh; y++) for (let x = bx; x < bx + bw; x++)
         set(x, y, (x === bx || x === bx + bw - 1 || y === by || y === by + bh - 1) ? OT.WALL : OT.PATH);
+      buildings.push({ x: bx, y: by, w: bw, h: bh, type: 'deco' });
     };
     deco(44, 8, 5, 4); deco(44, 16, 5, 4); deco(34, 26, 5, 4);
 
@@ -198,7 +201,7 @@ export class Game {
 
     return {
       tilemap: new TileMap(grid, 'overworld'), w: OW_W, h: OW_H,
-      farmland, animals, penBounds, placed: [], ground: [],
+      farmland, animals, penBounds, placed: [], ground: [], buildings,
       treeHp: {}, rockHp: {}, treeTimers: {}, rockTimers: {},
     };
   }
@@ -537,6 +540,7 @@ export class Game {
     this._renderFloatTexts();
     this._renderWeather();
     this._renderNight();
+    this._renderVignette();
   }
 
   _renderOverworld() {
@@ -544,16 +548,21 @@ export class Game {
     const sx0 = Math.max(0, (cam.x / TILE) | 0), sy0 = Math.max(0, (cam.y / TILE) | 0);
     const sx1 = Math.min(ow.w, ((cam.x + this.canvas.width) / TILE | 0) + 1);
     const sy1 = Math.min(ow.h, ((cam.y + this.canvas.height) / TILE | 0) + 1);
-    const grassFn = season === 'autumn' ? Sprites.grassAutumn : season === 'winter' ? Sprites.grassWinter : Sprites.grass;
+    const T = ow.tilemap;
+    // Masque d'écume/bordure : côtés dont le voisin diffère de la tuile donnée.
+    const edgeMask = (gx, gy, val, isWater) => {
+      const diff = (v) => isWater ? (v !== OT.WATER && v !== -1) : (v !== val && v !== -1);
+      return { n: diff(T.get(gx, gy - 1)), s: diff(T.get(gx, gy + 1)), e: diff(T.get(gx + 1, gy)), w: diff(T.get(gx - 1, gy)) };
+    };
 
     for (let gy = sy0; gy < sy1; gy++) for (let gx = sx0; gx < sx1; gx++) {
-      const t = ow.tilemap.get(gx, gy);
+      const t = T.get(gx, gy);
       const x = gx * TILE - cam.x, y = gy * TILE - cam.y, v = (gx * 7 + gy * 13) % 9;
-      if (t === OT.WATER) Sprites.water(ctx, x, y, this.globalT);
-      else if (t === OT.PATH) Sprites.path(ctx, x, y, v);
+      if (t === OT.WATER) Sprites.water(ctx, x, y, this.globalT, edgeMask(gx, gy, OT.WATER, true));
+      else if (t === OT.PATH) Sprites.path(ctx, x, y, v, edgeMask(gx, gy, OT.PATH, false));
       else if (t === OT.FARMLAND) { const pl = ow.farmland[gx + ',' + gy]; Sprites.farmland(ctx, x, y, pl && pl.watered); }
-      else grassFn(ctx, x, y, v);
-      if (t === OT.WALL) Sprites.wall(ctx, x, y);
+      else Sprites.grass(ctx, x, y, v, season);
+      if (t === OT.WALL) Sprites.wall(ctx, x, y, T.get(gx, gy - 1) !== OT.WALL);
       else if (t === OT.BED) Sprites.bed(ctx, x, y);
       else if (t === OT.QUESTBOARD) Sprites.questBoard(ctx, x, y);
       else if (t === OT.SHOPCOUNTER) Sprites.shopCounter(ctx, x, y);
@@ -561,6 +570,14 @@ export class Game {
       else if (t === OT.FENCE) Sprites.fence(ctx, x, y);
       else if (t === OT.ROCK) Sprites.rock(ctx, x, y);
       else if (t === OT.FARMLAND) { const pl = ow.farmland[gx + ',' + gy]; if (pl && pl.cropId) Sprites.cropStage(ctx, x, y, pl.cropId, pl.stage); }
+    }
+
+    // Détails des bâtiments : fenêtres aux angles de façade + porte (maisons déco)
+    for (const b of ow.buildings) {
+      const fy = (b.y + b.h - 1) * TILE - cam.y;
+      Sprites.window(ctx, b.x * TILE - cam.x, fy);
+      Sprites.window(ctx, (b.x + b.w - 1) * TILE - cam.x, fy);
+      if (b.type === 'deco') Sprites.door(ctx, (b.x + (b.w / 2 | 0)) * TILE - cam.x, fy);
     }
 
     const drawables = [];
@@ -703,6 +720,29 @@ export class Game {
     }
     nc.globalCompositeOperation = 'source-over';
     this.ctx.drawImage(this.nightCanvas, 0, 0);
+
+    // Halo chaud additif autour du joueur et des torches (ambiance nocturne)
+    if (info.alpha > 0.4) {
+      const ctx = this.ctx; ctx.save(); ctx.globalCompositeOperation = 'lighter';
+      const warm = (x, y, r, a) => {
+        const g = ctx.createRadialGradient(x, y, 2, x, y, r);
+        g.addColorStop(0, `rgba(255,180,90,${a})`); g.addColorStop(1, 'rgba(255,180,90,0)');
+        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+      };
+      warm(psx, psy, 150, 0.10);
+      for (const o of this.curScene().placed) {
+        if (o.type !== 'torch') continue;
+        warm(o.gx * TILE + TILE / 2 - this.camera.x, o.gy * TILE + TILE / 2 - this.camera.y, 110, 0.18);
+      }
+      ctx.restore();
+    }
+  }
+
+  _renderVignette() {
+    const ctx = this.ctx, W = this.canvas.width, H = this.canvas.height;
+    const g = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.36, W / 2, H / 2, Math.max(W, H) * 0.72);
+    g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(0,0,0,0.34)');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
   }
 
   // ---------------- Boucle ----------------
