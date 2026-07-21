@@ -26,25 +26,27 @@ const GRASS_PAL = {
 
 export const Sprites = {
   // ================= Tuiles overworld =================
-  grass(c, x, y, v, season) {
+  // gx,gy = coordonnées MONDE de la tuile (indispensable : le hash doit être
+  // stable quand la caméra défile, sinon les détails scintillent).
+  grass(c, x, y, v, season, gx, gy) {
     const P = GRASS_PAL[season] || GRASS_PAL.spring;
     // damier subtil pour la texture de fond
-    rect(c, x, y, TILE, TILE, ((x / TILE + y / TILE) & 1) ? P.a : P.b);
+    rect(c, x, y, TILE, TILE, ((gx + gy) & 1) ? P.a : P.b);
     // patch d'ombre douce
     c.fillStyle = P.lo;
-    const h1 = hash(x, y);
+    const h1 = hash(gx, gy);
     if (h1 < 0.5) c.fillRect(x + ((h1 * 20) | 0), y + 18 + ((h1 * 8) | 0), 10, 6);
     // brins d'herbe
     c.strokeStyle = P.blade; c.lineWidth = 1;
     const n = 3 + ((h1 * 3) | 0);
     for (let i = 0; i < n; i++) {
-      const hh = hash(x + i * 13, y + i * 7);
+      const hh = hash(gx + i * 13, gy + i * 7);
       const bx = x + 3 + hh * 26, by = y + 8 + ((hh * 20) | 0);
       c.beginPath(); c.moveTo(bx, by + 4); c.lineTo(bx - 1, by); c.stroke();
       c.beginPath(); c.moveTo(bx + 2, by + 4); c.lineTo(bx + 3, by); c.stroke();
     }
     // fleurs / pépites occasionnelles
-    const h2 = hash(x + 99, y + 51);
+    const h2 = hash(gx + 99, gy + 51);
     if (h2 > 0.9) {
       const fx = x + 8 + h2 * 14, fy = y + 10 + h2 * 10;
       const col = P.flower[(h2 * 3) | 0];
@@ -52,16 +54,16 @@ export const Sprites = {
     } else if (h2 > 0.82) {
       rect(c, x + 6 + h2 * 18, y + 20, 3, 2, 'rgba(0,0,0,0.10)');
     }
-    if (season === 'winter' && hash(x + 5, y + 9) > 0.7) rect(c, x + (hash(x, y + 2) * 24 | 0), y + (hash(x + 1, y) * 24 | 0), 3, 3, 'rgba(255,255,255,0.7)');
+    if (season === 'winter' && hash(gx + 5, gy + 9) > 0.7) rect(c, x + (hash(gx, gy + 2) * 24 | 0), y + (hash(gx + 1, gy) * 24 | 0), 3, 3, 'rgba(255,255,255,0.7)');
   },
-  grassAutumn(c, x, y, v) { Sprites.grass(c, x, y, v, 'autumn'); },
-  grassWinter(c, x, y, v) { Sprites.grass(c, x, y, v, 'winter'); },
+  grassAutumn(c, x, y, v, gx, gy) { Sprites.grass(c, x, y, v, 'autumn', gx, gy); },
+  grassWinter(c, x, y, v, gx, gy) { Sprites.grass(c, x, y, v, 'winter', gx, gy); },
 
-  path(c, x, y, v, edges) {
+  path(c, x, y, v, edges, gx, gy) {
     rect(c, x, y, TILE, TILE, '#c8a86a');
     // grain de terre
     c.fillStyle = '#bd9a5a';
-    const h = hash(x, y);
+    const h = hash(gx, gy);
     rect(c, x + 4, y + 6, 7, 4); rect(c, x + 18, y + 18, 8, 4);
     c.fillStyle = '#d8bd82';
     rect(c, x + 20, y + 6, 5, 3); rect(c, x + 6, y + 20, 4, 3);
@@ -77,7 +79,7 @@ export const Sprites = {
     }
   },
 
-  water(c, x, y, t, edges) {
+  water(c, x, y, t, edges, gx, gy) {
     // profondeur : dégradé vertical
     const g = c.createLinearGradient(x, y, x, y + TILE);
     g.addColorStop(0, '#2f79a8'); g.addColorStop(1, '#215a86');
@@ -97,8 +99,8 @@ export const Sprites = {
       c.beginPath(); c.moveTo(x + i + off, y - 2); c.lineTo(x + i + off + 7, y + TILE + 2); c.stroke();
     }
     c.restore(); c.globalAlpha = 1;
-    // reflets scintillants
-    if (hash(x, y + (t * 2 | 0)) > 0.86) rect(c, x + 8 + hash(x, y) * 14, y + 20, 3, 1, 'rgba(255,255,255,0.55)');
+    // reflets scintillants (position stable, clignotement temporel)
+    if (hash(gx, gy + (t * 2 | 0)) > 0.86) rect(c, x + 8 + hash(gx, gy) * 14, y + 20, 3, 1, 'rgba(255,255,255,0.55)');
     // écume de rivage sur les bords touchant la terre
     if (edges) {
       c.fillStyle = 'rgba(220,240,255,0.55)';
@@ -125,14 +127,15 @@ export const Sprites = {
     if (wet) { c.fillStyle = 'rgba(80,130,180,0.18)'; c.fillRect(x + 2, y + 2, TILE - 4, TILE - 4); }
   },
 
-  tree(c, x, y, t, season) {
+  tree(c, x, y, t, season, seed = 0) {
     const cx = x + TILE / 2;
     shadow(c, cx + 3, y + TILE - 2, 15, 5);
     // tronc texturé
     rect(c, cx - 4, y + TILE - 15, 8, 15, '#5b3a20');
     rect(c, cx - 4, y + TILE - 15, 3, 15, '#6e4a2a');
     rect(c, cx + 1, y + TILE - 15, 3, 15, '#4a2f18');
-    const sway = Math.sin(t + x * 0.01) * 2;
+    // balancement basé sur une graine MONDE (stable pendant le défilement)
+    const sway = Math.sin(t + seed * 0.7) * 2;
     if (season === 'winter') {
       // canopée dénudée + neige
       c.strokeStyle = '#6b4a2b'; c.lineWidth = 2;
@@ -304,9 +307,9 @@ export const Sprites = {
     c.strokeStyle = '#a88a30'; for (let i = 0; i < 4; i++) { c.beginPath(); c.moveTo(x + 9 + i * 4, y + 25); c.lineTo(x + 10 + i * 4, y + 30); c.stroke(); }
   },
 
-  torch(c, x, y, t) {
+  torch(c, x, y, t, seed = 0) {
     rect(c, x + 14, y + 12, 4, 20, '#5a3d24'); rect(c, x + 14, y + 12, 1, 20, '#7d5330');
-    const f = 0.7 + Math.sin(t * 14 + x) * 0.3;
+    const f = 0.7 + Math.sin(t * 14 + seed) * 0.3;
     c.fillStyle = `rgba(255,${120 + (40 * f) | 0},20,0.9)`;
     c.beginPath(); c.moveTo(x + 16, y + 1); c.lineTo(x + 22, y + 13); c.lineTo(x + 10, y + 13); c.closePath(); c.fill();
     c.fillStyle = 'rgba(255,210,90,0.95)';
@@ -337,10 +340,10 @@ export const Sprites = {
   },
 
   // ================= Tuiles mine =================
-  mineFloor(c, x, y, v) {
-    rect(c, x, y, TILE, TILE, ((x / TILE + y / TILE) & 1) ? '#43392f' : '#3d342b');
+  mineFloor(c, x, y, v, gx = 0, gy = 0) {
+    rect(c, x, y, TILE, TILE, ((gx + gy) & 1) ? '#43392f' : '#3d342b');
     c.fillStyle = 'rgba(0,0,0,0.12)';
-    const h = hash(x, y);
+    const h = hash(gx, gy);
     if (h < 0.4) c.fillRect(x + (h * 20 | 0), y + 8 + (h * 12 | 0), 4, 3);
     if (h > 0.85) circ(c, x + 8 + h * 14, y + 20, 1.4, 'rgba(255,255,255,0.06)');
   },
@@ -359,8 +362,8 @@ export const Sprites = {
     // scintillement
     if (kind === 'diamond' || kind === 'gold') { c.fillStyle = 'rgba(255,255,255,0.7)'; rect(c, x + 10, y + 11, 1.5, 1.5); }
   },
-  mineEntranceTile(c, x, y) {
-    Sprites.mineFloor(c, x, y, 0);
+  mineEntranceTile(c, x, y, gx = 0, gy = 0) {
+    Sprites.mineFloor(c, x, y, 0, gx, gy);
     c.fillStyle = 'rgba(255,235,180,0.16)'; circ(c, x + 16, y + 16, 13, 'rgba(255,235,180,0.14)');
     rect(c, x + 4, y + 2, 24, 3, '#5a3d24'); // poutre
   },

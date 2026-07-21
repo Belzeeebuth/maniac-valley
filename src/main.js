@@ -4,10 +4,12 @@
 
 import { Game } from './engine/Game.js';
 import { SoundFX } from './engine/SoundFX.js';
+import { Sprites } from './graphics/SpriteSheetGenerator.js';
 
 const game = new Game();
 // Exposé pour le débogage en console (et les tests automatisés).
 window.MV = game;
+window.Sprites = Sprites;
 
 // Fond d'écran-titre animé (rendu sur le canvas, derrière l'UI d'accueil).
 game.startTitle();

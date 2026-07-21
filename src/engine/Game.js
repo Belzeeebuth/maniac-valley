@@ -866,10 +866,10 @@ export class Game {
     for (let gy = sy0; gy < sy1; gy++) for (let gx = sx0; gx < sx1; gx++) {
       const t = T.get(gx, gy);
       const x = gx * TILE - cam.x, y = gy * TILE - cam.y, v = (gx * 7 + gy * 13) % 9;
-      if (t === OT.WATER) Sprites.water(ctx, x, y, this.globalT, edgeMask(gx, gy, OT.WATER, true));
-      else if (t === OT.PATH) Sprites.path(ctx, x, y, v, edgeMask(gx, gy, OT.PATH, false));
+      if (t === OT.WATER) Sprites.water(ctx, x, y, this.globalT, edgeMask(gx, gy, OT.WATER, true), gx, gy);
+      else if (t === OT.PATH) Sprites.path(ctx, x, y, v, edgeMask(gx, gy, OT.PATH, false), gx, gy);
       else if (t === OT.FARMLAND) { const pl = ow.farmland[gx + ',' + gy]; Sprites.farmland(ctx, x, y, pl && pl.watered); }
-      else Sprites.grass(ctx, x, y, v, season);
+      else Sprites.grass(ctx, x, y, v, season, gx, gy);
       if (t === OT.WALL) Sprites.wall(ctx, x, y, T.get(gx, gy - 1) !== OT.WALL);
       else if (t === OT.BED) Sprites.bed(ctx, x, y);
       else if (t === OT.QUESTBOARD) Sprites.questBoard(ctx, x, y);
@@ -896,7 +896,7 @@ export class Game {
       if (ow.tilemap.get(gx, gy) === OT.TREE)
         drawables.push({ y: gy * TILE + TILE, fn: () => {
           this._sunShadow(gx * TILE + TILE / 2 - cam.x, gy * TILE + TILE - 2 - cam.y, 15, 9);
-          Sprites.tree(ctx, gx * TILE - cam.x, gy * TILE - cam.y, this.globalT, season);
+          Sprites.tree(ctx, gx * TILE - cam.x, gy * TILE - cam.y, this.globalT, season, gx * 3 + gy);
         } });
     for (const o of ow.placed) {
       if (o.type === 'fence') continue;
@@ -905,7 +905,7 @@ export class Game {
         if (o.type === 'chest') Sprites.chest(ctx, x, y);
         else if (o.type === 'furnace') Sprites.furnace(ctx, x, y, this.globalT);
         else if (o.type === 'scarecrow') Sprites.scarecrow(ctx, x, y);
-        else if (o.type === 'torch') Sprites.torch(ctx, x, y, this.globalT);
+        else if (o.type === "torch") Sprites.torch(ctx, x, y, this.globalT, o.gx * 3 + o.gy);
       } });
     }
     drawables.push({ y: this.shopPos.y, fn: () => Sprites.shopkeeper(ctx, this.shopPos.x - cam.x, this.shopPos.y - cam.y - 14) });
@@ -928,14 +928,14 @@ export class Game {
       else if (t === MT.ORE_IRON) Sprites.mineOre(ctx, x, y, 'iron');
       else if (t === MT.ORE_GOLD) Sprites.mineOre(ctx, x, y, 'gold');
       else if (t === MT.ORE_DIAMOND) Sprites.mineOre(ctx, x, y, 'diamond');
-      else if (t === MT.STAIRS || t === MT.STAIRS_SEALED) { Sprites.mineFloor(ctx, x, y, v); Sprites.stairsDown(ctx, x, y, t === MT.STAIRS_SEALED); }
-      else if (t === MT.ENTRANCE) Sprites.mineEntranceTile(ctx, x, y);
-      else Sprites.mineFloor(ctx, x, y, v);
+      else if (t === MT.STAIRS || t === MT.STAIRS_SEALED) { Sprites.mineFloor(ctx, x, y, v, gx, gy); Sprites.stairsDown(ctx, x, y, t === MT.STAIRS_SEALED); }
+      else if (t === MT.ENTRANCE) Sprites.mineEntranceTile(ctx, x, y, gx, gy);
+      else Sprites.mineFloor(ctx, x, y, v, gx, gy);
     }
     for (const o of m.placed) {
       const x = o.gx * TILE - cam.x, y = o.gy * TILE - cam.y;
       if (o.type === 'chest') Sprites.chest(ctx, x, y);
-      else if (o.type === 'torch') Sprites.torch(ctx, x, y, this.globalT);
+      else if (o.type === "torch") Sprites.torch(ctx, x, y, this.globalT, o.gx * 3 + o.gy);
     }
     const drawables = [];
     for (const g of m.ground) drawables.push({ y: g.y, fn: () => this._drawGround(g) });
