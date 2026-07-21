@@ -38,7 +38,7 @@ export class InputHandler {
       if (this._onHotbar) this._onHotbar(n - 1);
       return;
     }
-    if (['KeyE', 'KeyC', 'KeyJ', 'Escape'].includes(e.code)) {
+    if (['KeyE', 'KeyC', 'KeyJ', 'KeyM', 'Escape'].includes(e.code)) {
       if (this._onToggle) this._onToggle(e.code);
     }
   }

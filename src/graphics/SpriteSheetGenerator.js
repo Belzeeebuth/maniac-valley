@@ -88,8 +88,17 @@ export const Sprites = {
     c.beginPath(); c.moveTo(x + 3, y + 16 + w); c.lineTo(x + 29, y + 16 + w); c.stroke();
     c.strokeStyle = 'rgba(255,255,255,0.14)';
     c.beginPath(); c.moveTo(x + 3, y + 8 - w); c.lineTo(x + 29, y + 8 - w); c.stroke();
+    // caustiques : bandes de lumière diagonales animées
+    c.save();
+    c.beginPath(); c.rect(x, y, TILE, TILE); c.clip();
+    c.globalAlpha = 0.10; c.strokeStyle = '#bfe8ff'; c.lineWidth = 2;
+    const off = (t * 18) % (TILE + 12);
+    for (let i = -TILE; i < TILE + 12; i += 11) {
+      c.beginPath(); c.moveTo(x + i + off, y - 2); c.lineTo(x + i + off + 7, y + TILE + 2); c.stroke();
+    }
+    c.restore(); c.globalAlpha = 1;
     // reflets scintillants
-    if (hash(x, y + (t * 2 | 0)) > 0.88) rect(c, x + 8 + hash(x, y) * 14, y + 20, 3, 1, 'rgba(255,255,255,0.4)');
+    if (hash(x, y + (t * 2 | 0)) > 0.86) rect(c, x + 8 + hash(x, y) * 14, y + 20, 3, 1, 'rgba(255,255,255,0.55)');
     // écume de rivage sur les bords touchant la terre
     if (edges) {
       c.fillStyle = 'rgba(220,240,255,0.55)';

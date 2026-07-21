@@ -51,12 +51,15 @@ export class FarmingSystem {
           ow.treeHp[key] = (ow.treeHp[key] ?? 3) - (1 + p.axeLevel);
           g.sound.play('chop');
           g.floatText(f.wx, f.wy - 10, '-' + (1 + p.axeLevel), '#8a6238');
+          for (let i = 0; i < 3; i++) g.particles.leaf(f.wx + (Math.random() * 16 - 8), f.wy - 16, g.time.seasonKey === 'autumn' ? '#c9772a' : '#3f9a44');
           if (ow.treeHp[key] <= 0) {
             ow.tilemap.set(f.gx, f.gy, OT.GRASS);
             delete ow.treeHp[key];
             ow.treeTimers[key] = g.time.day + 2 + (Math.random() * 3 | 0);
             const n = 3 + (Math.random() * 4 | 0);
             g.inventory.add('wood', n); g.loot('wood', n);
+            for (let i = 0; i < 8; i++) g.particles.leaf(f.wx + (Math.random() * 20 - 10), f.wy - 14, g.time.seasonKey === 'autumn' ? '#c9772a' : '#3f9a44');
+            g.camera.shake(3, 0.15);
           }
         } else g.toast("Il n'y a pas d'arbre ici.");
         return;
@@ -68,6 +71,7 @@ export class FarmingSystem {
           ow.rockHp[key] = (ow.rockHp[key] ?? 3) - (1 + p.pickLevel);
           g.sound.play('mine');
           g.floatText(f.wx, f.wy - 10, '-' + (1 + p.pickLevel), '#999');
+          g.particles.hit(f.wx, f.wy, '#b0b0b8', 5);
           if (ow.rockHp[key] <= 0) {
             ow.tilemap.set(f.gx, f.gy, OT.GRASS);
             delete ow.rockHp[key];
@@ -75,6 +79,7 @@ export class FarmingSystem {
             const n = 2 + (Math.random() * 3 | 0);
             g.inventory.add('stone', n); g.loot('stone', n);
             if (Math.random() < 0.3) { g.inventory.add('coal', 1); g.loot('coal', 1); }
+            g.particles.death(f.wx, f.wy, '#9a9aa2', 10); g.camera.shake(3, 0.14);
           }
         } else g.toast("Rien à miner ici.");
         return;
@@ -95,6 +100,7 @@ export class FarmingSystem {
     g.sound.play('mine');
     const wx = gx * TILE + TILE / 2, wy = gy * TILE + TILE / 2;
     g.floatText(wx, wy - 10, '-' + (1 + p.pickLevel), '#999');
+    g.particles.hit(wx, wy, TileMap.isOreMine(t) ? '#ffe680' : '#b0b0b8', 5);
     if (m.hp[gy][gx] <= 0) {
       let drop;
       if (t === MT.ORE_COPPER) { drop = 'copper'; p.mined.copper++; }
@@ -105,6 +111,10 @@ export class FarmingSystem {
       const n = drop === 'stone' ? (1 + (Math.random() * 3 | 0)) : 1;
       g.inventory.add(drop, n); g.loot(drop, n);
       g.quests.onMine(drop);
+      const gemCol = { copper: '#e0985a', iron: '#dcdcea', gold_ore: '#ffe680', diamond: '#bff5f0' }[drop];
+      if (gemCol) g.particles.sparkle(wx, wy, gemCol, 10);
+      g.particles.death(wx, wy, '#6a5f52', 8);
+      g.camera.shake(2.5, 0.12);
       m.tilemap.set(gx, gy, MT.FLOOR);
     }
   }

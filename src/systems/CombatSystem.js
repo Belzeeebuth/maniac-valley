@@ -46,12 +46,22 @@ export class CombatSystem {
     if (hit) g.sound.play('hit');
   }
 
+  _enemyColor(e) {
+    return e.kind === 'slime' ? (e.tint || '#43cf5e')
+      : e.kind === 'skeleton' ? '#e6e6dc'
+      : e.kind === 'bat' ? '#6a4a7a'
+      : e.kind === 'boss_gigaslime' ? '#8a34a8' : '#8a6a3a';
+  }
+
   damageEnemy(e, dmg, crit) {
     const g = this.game, p = g.player;
     e.hp -= dmg;
     e.iframes = 0.25;
     g.floatText(e.x, e.y - 20, (crit ? '✦' : '') + '-' + dmg, crit ? '#ffe24a' : '#ff5050', crit);
     g.sound.play(e.kind.startsWith('boss') ? 'boss_hit' : (crit ? 'crit' : 'enemyhit'));
+    g.particles.hit(e.x, e.y, this._enemyColor(e), crit ? 12 : 8);
+    if (e.kind.startsWith('boss')) g.camera.shake(4, 0.16);
+    else if (crit) g.camera.shake(3, 0.12);
     const ang = Math.atan2(e.y - p.cy, e.x - p.cx);
     e.vx = Math.cos(ang) * 260; e.vy = Math.sin(ang) * 260;
 
@@ -79,6 +89,8 @@ export class CombatSystem {
   killEnemy(e) {
     const g = this.game;
     g.sound.play('death');
+    g.particles.death(e.x, e.y, this._enemyColor(e), e.kind.startsWith('boss') ? 40 : 16);
+    if (e.kind.startsWith('boss')) g.camera.shake(12, 0.7);
     if (e.kind === 'slime' || e.kind === 'skeleton' || e.kind === 'bat') {
       g.player.kills[e.kind] = (g.player.kills[e.kind] || 0) + 1;
       g.quests.onKill(e.kind);
@@ -201,6 +213,7 @@ export class CombatSystem {
       b.phase = 'ground';
       if (b.stateT <= 0) {
         g.sound.play('boss_roar');
+        g.camera.shake(10, 0.5);
         this.spawnFallingRocks(b.x, b.y, 5);
         b.state = 'charge'; b.stateT = 1.0;
         const ang = Math.atan2(p.cy - b.y, p.cx - b.x);
@@ -216,6 +229,8 @@ export class CombatSystem {
   spawnShockwave(x, y) {
     this.game.effects.shockwaves.push({ x, y, r: 10, maxR: 120, life: 0.6, hit: false });
     this.game.sound.play('shockwave');
+    this.game.camera.shake(8, 0.4);
+    this.game.particles.hit(x, y, '#c890ff', 14);
   }
   spawnFallingRocks(x, y, n) {
     for (let i = 0; i < n; i++) {
@@ -231,6 +246,8 @@ export class CombatSystem {
     p.iframes = 1.0;
     g.sound.play('hurt');
     g.flashHp();
+    g.camera.shake(6, 0.28);
+    g.particles.hit(p.cx, p.cy, '#ff6a6a', 10);
     g.floatText(p.cx, p.y - 6, '-' + dmg, '#ff5a5a');
     const ang = Math.atan2(p.cy - sy, p.cx - sx);
     const nx = p.x + Math.cos(ang) * 22, ny = p.y + Math.sin(ang) * 22;

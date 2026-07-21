@@ -42,6 +42,9 @@ Le jeu existe aussi en un **unique `public/classic.html`** ouvrable directement 
 - **Quêtes & boutique** : 3 quêtes actives tirées d'un pool (livraison, chasse, fabrication, minage) ; boutique PNJ d'achat/revente.
 - **UI style Stardew/Terraria** : panneaux bois/pierre, Hotbar 10 slots, inventaire 4×8 avec **drag-and-drop**, **infobulles de rareté** (Commun / Rare / Épique / Maniaque), **dégâts flottants** colorés et **popups de butin**.
 - **Rendu & post-traitement ("shaders" Canvas 2D)** : pixel art ombré en 3 tons avec ombres portées directionnelles (selon l'heure du soleil), **bloom / lumières émissives** floutées (torches, fourneau, lanterne du joueur, lucioles, récoltes prêtes, aura des boss), **color grading** cinématographique (golden hour, nuit bleutée, éclipse pourpre, pluie désaturée, teinte de mine), **particules d'ambiance** (pétales au printemps, feuilles en automne, poussières en été, lucioles la nuit), **grain de film**, fines scanlines et vignette.
+- **Effets & vie** : **système de particules** (poussière de pas, étincelles de minage, éclats de mort, embers de torche, fumée de cheminée & de fourneau, feuilles), **screen shake** (dégâts, coups critiques, boss, minage), **eau animée** avec caustiques et reflets, **éclairs** pendant les orages (flash + foudre + tonnerre), **ombres de nuages** qui défilent, et **papillons** le jour.
+- **Écran-titre animé** : ciel crépusculaire, lune et halo, étoiles scintillantes, collines en parallaxe, silhouettes d'arbres et lucioles.
+- **Musique procédurale** (Web Audio) : ambiance générée à la volée qui s'adapte à la scène (ferme paisible / mine tendue / combat de boss), coupable avec **M**. Aucun fichier audio.
 
 ## 📁 Architecture
 

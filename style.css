@@ -49,6 +49,13 @@ html, body {
   border-radius: 6px;
 }
 
+/* Masquer le HUD de jeu tant que l'écran-titre est affiché */
+body.in-title #hud,
+body.in-title #hotbar,
+body.in-title #menuButtons,
+body.in-title #bossBar,
+body.in-title .scene-label { display: none !important; }
+
 /* ---------- Scene label ---------- */
 .scene-label {
   position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
@@ -271,7 +278,7 @@ html, body {
 #startScreen {
   position: absolute; inset: 0; display: flex; flex-direction: column;
   align-items: center; justify-content: center; z-index: 70;
-  background: radial-gradient(circle at 50% 40%, #33240f 0%, #0b0d1a 80%);
+  background: linear-gradient(180deg, rgba(10,8,26,0.35) 0%, rgba(10,8,26,0) 45%, rgba(15,20,10,0.35) 100%);
 }
 #startScreen h1 {
   font-family: var(--font-pixel); font-size: 46px; color: var(--gold); margin: 0 0 10px;

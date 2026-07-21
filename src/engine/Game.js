@@ -10,6 +10,7 @@ import { generateMine, MAX_FLOOR } from '../world/MineGenerator.js';
 import { Camera } from './Camera.js';
 import { InputHandler } from './InputHandler.js';
 import { SoundFX } from './SoundFX.js';
+import { MusicFX } from './MusicFX.js';
 import { Sprites } from '../graphics/SpriteSheetGenerator.js';
 import { PostFX } from '../graphics/PostFX.js';
 import { Player } from '../entities/Player.js';
@@ -21,6 +22,7 @@ import { FarmingSystem } from '../systems/FarmingSystem.js';
 import { CombatSystem } from '../systems/CombatSystem.js';
 import { CraftingSystem } from '../systems/CraftingSystem.js';
 import { QuestSystem } from '../systems/QuestSystem.js';
+import { Particles } from '../systems/Particles.js';
 import { HUD } from '../ui/HUD.js';
 import { InventoryUI } from '../ui/InventoryUI.js';
 import { CraftingUI } from '../ui/CraftingUI.js';
@@ -31,6 +33,7 @@ import { Tooltip } from '../ui/Tooltip.js';
 const OW_W = 56, OW_H = 42;
 const rand = (a, b) => Math.random() * (b - a) + a;
 const ri = (a, b) => Math.floor(rand(a, b + 1));
+const choice = (arr) => arr[Math.floor(Math.random() * arr.length)];
 const dist = (x1, y1, x2, y2) => Math.hypot(x2 - x1, y2 - y1);
 
 export class Game {
@@ -42,6 +45,7 @@ export class Game {
     this.nightCtx = this.nightCanvas.getContext('2d');
 
     this.sound = SoundFX;
+    this.music = new MusicFX();
     this.time = new DayNightCycle();
     this.camera = new Camera();
     this.inventory = new Inventory();
@@ -51,9 +55,13 @@ export class Game {
     this.mine = null;
     this.player = null;
 
-    this.effects = { floatTexts: [], shockwaves: [], fallingRocks: [], weatherParticles: [], ambient: [], fireflies: [] };
+    this.effects = { floatTexts: [], shockwaves: [], fallingRocks: [], weatherParticles: [], ambient: [], fireflies: [], clouds: [], butterflies: [] };
     this.postfx = new PostFX(this.canvas);
+    this.particles = new Particles();
     this._sun = { skew: 0, alpha: 0 };
+    this._lightning = { timer: rand(5, 12), flash: 0, boltT: 0, bolt: null };
+    this._stepAccum = 0; this._smokeT = 0; this._emberT = 0;
+    this._prevPos = { x: 0, y: 0 };
 
     this.modals = { inventory: false, crafting: false, quests: false, shop: false };
     this.faint = false;
@@ -111,6 +119,7 @@ export class Game {
       if (code === 'KeyE') this.toggleModal('inventory');
       else if (code === 'KeyC') this.toggleModal('crafting');
       else if (code === 'KeyJ') this.toggleModal('quests');
+      else if (code === 'KeyM') { const on = this.music.toggle(); this.toast(on ? '🎵 Musique activée' : '🔇 Musique coupée'); }
     });
   }
 
@@ -405,7 +414,7 @@ export class Game {
     this.camera.snap(this.player, this.mine.w, this.mine.h, this.canvas.width, this.canvas.height);
     this.sound.play('stairs');
     this.toast('Mine — Étage ' + level + (level > 10 ? ' (profondeurs maniaques)' : ''));
-    if (this.mine.isBoss) setTimeout(() => { if (this.mine && this.mine.boss) { this.toast('⚠ Un boss garde ce niveau !'); this.sound.play('boss_roar'); } }, 400);
+    if (this.mine.isBoss) setTimeout(() => { if (this.mine && this.mine.boss) { this.toast('⚠ Un boss garde ce niveau !'); this.sound.play('boss_roar'); this.camera.shake(9, 0.6); } }, 400);
   }
   exitMine() {
     this.scene = 'overworld';
@@ -483,12 +492,15 @@ export class Game {
       this.combat.updateEnemies(dt);
       this.combat.updateEffects(dt);
       this._updateGroundPickup();
+      this._updateJuice(dt);
     }
+    this.particles.update(dt);
 
     this.camera.follow(this.player, this.curScene().w, this.curScene().h, this.canvas.width, this.canvas.height, dt);
     this._updateFloatTexts(dt);
     this._updateWeather(dt);
     this._updateAmbient(dt);
+    this.music.setScene(this.scene === 'mine' ? (this.mine.boss ? 'boss' : 'mine') : 'farm');
     this.hud.update();
     this._updateInteractPrompt();
   }
@@ -497,8 +509,8 @@ export class Game {
     const s = this.curScene(), p = this.player;
     for (const g of s.ground) {
       if (dist(p.cx, p.cy, g.x, g.y) < TILE * 0.85) {
-        if (g.kind === 'gold') { p.gold += g.amount; this.sound.play('coin'); this.floatText(g.x, g.y, '+' + g.amount + ' or', '#ffd700'); }
-        else { this.inventory.add(g.item, 1); this.loot(g.item, 1); this.sound.play('pickup'); this.hud.renderHotbar(); }
+        if (g.kind === 'gold') { p.gold += g.amount; this.sound.play('coin'); this.floatText(g.x, g.y, '+' + g.amount + ' or', '#ffd700'); this.particles.sparkle(g.x, g.y, '#ffe680', 6); }
+        else { this.inventory.add(g.item, 1); this.loot(g.item, 1); this.sound.play('pickup'); this.particles.sparkle(g.x, g.y, '#c8ffc8', 5); this.hud.renderHotbar(); }
         g.picked = true;
       }
     }
@@ -560,6 +572,25 @@ export class Game {
     const ff = [];
     for (let i = 0; i < 20; i++) ff.push({ x: Math.random() * W, y: Math.random() * H, ph: rand(0, 6.28), vx: rand(-10, 10), vy: rand(-10, 10) });
     this.effects.fireflies = ff;
+    // papillons (jour, printemps/été)
+    const bf = [];
+    if (season === 'spring' || season === 'summer') {
+      for (let i = 0; i < 6; i++) bf.push({
+        x: rand(4 * TILE, (this.overworld ? this.overworld.w - 4 : 40) * TILE), y: rand(4 * TILE, (this.overworld ? this.overworld.h - 4 : 30) * TILE),
+        ph: rand(0, 6.28), dir: rand(0, 6.28), turnT: rand(1, 3), sp: rand(22, 38),
+        col: choice(['#ffd24a', '#ff8fb8', '#7fd0ff', '#f0f0f0']),
+      });
+    }
+    this.effects.butterflies = bf;
+    // nuages dérivants (ombres au sol)
+    this._initClouds();
+  }
+
+  _initClouds() {
+    const clouds = [];
+    const W = (this.overworld ? this.overworld.w : 56) * TILE, H = (this.overworld ? this.overworld.h : 42) * TILE;
+    for (let i = 0; i < 5; i++) clouds.push({ x: rand(0, W), y: rand(0, H), rx: rand(110, 220), ry: rand(70, 130), vx: rand(9, 18) });
+    this.effects.clouds = clouds;
   }
 
   _updateAmbient(dt) {
@@ -578,10 +609,79 @@ export class Game {
       if (f.x < 0) f.x = W; if (f.x > W) f.x = 0;
       if (f.y < 0) f.y = H; if (f.y > H) f.y = 0;
     }
+    // papillons (monde) — vol erratique
+    const ow = this.overworld;
+    if (ow) for (const b of this.effects.butterflies) {
+      b.ph += dt * 12; b.turnT -= dt;
+      if (b.turnT <= 0) { b.turnT = rand(0.8, 2.2); b.dir += rand(-1.2, 1.2); }
+      b.x += Math.cos(b.dir) * b.sp * dt;
+      b.y += Math.sin(b.dir) * b.sp * dt + Math.sin(b.ph) * 6 * dt;
+      b.x = Math.min(Math.max(b.x, 2 * TILE), (ow.w - 2) * TILE);
+      b.y = Math.min(Math.max(b.y, 2 * TILE), (ow.h - 2) * TILE);
+    }
+    // nuages
+    if (ow) for (const c of this.effects.clouds) {
+      c.x += c.vx * dt;
+      if (c.x - c.rx > ow.w * TILE) { c.x = -c.rx; c.y = rand(0, ow.h * TILE); }
+    }
   }
 
   _firefliesActive() {
     return this.scene === 'overworld' && this.time.ambient().alpha > 0.45 && !this.time.isRaining;
+  }
+
+  // Poussière de pas, embers de torche, fumée de cheminée, éclairs d'orage.
+  _updateJuice(dt) {
+    const p = this.player;
+    // pas
+    const moved = Math.hypot(p.x - this._prevPos.x, p.y - this._prevPos.y);
+    this._prevPos.x = p.x; this._prevPos.y = p.y;
+    if (p.moving && !p.dodging) {
+      this._stepAccum += moved;
+      if (this._stepAccum > 22) { this._stepAccum = 0; this.particles.dust(p.cx, p.y + p.h, 3); }
+    }
+    if (p.dodging && Math.random() < 0.5) this.particles.dust(p.cx, p.y + p.h, 2);
+
+    // embers de torche + fumée fourneau
+    this._emberT -= dt;
+    if (this._emberT <= 0) {
+      this._emberT = 0.12;
+      for (const o of this.curScene().placed) {
+        if (o.type === 'torch') this.particles.ember(o.gx * TILE + TILE / 2, o.gy * TILE + 6);
+        else if (o.type === 'furnace' && Math.random() < 0.6) this.particles.smoke(o.gx * TILE + TILE / 2 + 6, o.gy * TILE);
+      }
+    }
+    // fumée de cheminée
+    if (this.scene === 'overworld') {
+      this._smokeT -= dt;
+      if (this._smokeT <= 0) {
+        this._smokeT = 0.5;
+        for (const b of this.overworld.buildings) this.particles.smoke((b.x + b.w - 1.5) * TILE, b.y * TILE - 2);
+      }
+    }
+
+    // éclairs pendant la pluie (overworld)
+    const L = this._lightning;
+    if (this.scene === 'overworld' && this.time.isRaining) {
+      L.timer -= dt;
+      if (L.timer <= 0) {
+        L.timer = rand(6, 16);
+        L.flash = 1; L.boltT = 0.2;
+        L.bolt = this._makeBolt();
+        this.sound.play('thunder');
+        this.camera.shake(7, 0.5);
+      }
+    }
+    if (L.flash > 0) L.flash -= dt * 3.2;
+    if (L.boltT > 0) L.boltT -= dt;
+  }
+
+  _makeBolt() {
+    const pts = [];
+    let x = rand(this.canvas.width * 0.2, this.canvas.width * 0.8), y = 0;
+    const segH = this.canvas.height / 10;
+    while (y < this.canvas.height * 0.75) { pts.push({ x, y }); y += segH * rand(0.6, 1.1); x += rand(-40, 40); }
+    return pts;
   }
 
   _renderAmbient() {
@@ -595,6 +695,20 @@ export class Game {
       ctx.restore();
     }
     ctx.globalAlpha = 1;
+    // papillons (jour, hors pluie) — ailes battantes
+    const daytime = this.time.ambient().alpha < 0.35 && !this.time.isRaining;
+    if (daytime) {
+      const cam = this.camera;
+      for (const b of this.effects.butterflies) {
+        const x = b.x - cam.x, y = b.y - cam.y;
+        if (x < -20 || x > this.canvas.width + 20 || y < -20 || y > this.canvas.height + 20) continue;
+        const flap = Math.abs(Math.sin(b.ph)) * 4 + 1;
+        ctx.fillStyle = b.col;
+        ctx.beginPath(); ctx.ellipse(x - 2, y, flap, 3.5, -0.4, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.ellipse(x + 2, y, flap, 3.5, 0.4, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#3a2a18'; ctx.fillRect(x - 0.5, y - 2, 1, 4);
+      }
+    }
     // corps des lucioles (le halo est ajouté au bloom)
     if (this._firefliesActive()) {
       for (const f of this.effects.fireflies) {
@@ -685,6 +799,7 @@ export class Game {
     // 1) monde + ambiance + météo (couche "scène")
     if (this.scene === 'overworld') this._renderOverworld();
     else this._renderMine();
+    this.particles.draw(ctx, this.camera);
     this._renderAmbient();
     this._renderPlacementPreview();
     this._renderWeather();
@@ -694,10 +809,46 @@ export class Game {
     this.postfx.applyGrade(ctx, this._computeGrade());
     // 4) lumières émissives (bloom) par-dessus le grade
     this._renderLights();
-    // 5) textes flottants nets, puis grain + vignette
+    // 5) éclairs d'orage (par-dessus tout, avant le grain)
+    this._renderLightning();
+    // 6) textes flottants nets, puis grain + vignette
     this._renderFloatTexts();
     this.postfx.grain(ctx, 0.04);
     this.postfx.vignette(ctx, 0.32);
+  }
+
+  _renderClouds() {
+    if (this.scene !== 'overworld') return;
+    if (this.time.isRaining) return;
+    const ctx = this.ctx, cam = this.camera;
+    ctx.save();
+    for (const c of this.effects.clouds) {
+      const x = c.x - cam.x, y = c.y - cam.y;
+      if (x + c.rx < 0 || x - c.rx > this.canvas.width) continue;
+      const g = ctx.createRadialGradient(x, y, 10, x, y, c.rx);
+      g.addColorStop(0, 'rgba(0,0,0,0.12)'); g.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = g; ctx.beginPath(); ctx.ellipse(x, y, c.rx, c.ry, 0, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  _renderLightning() {
+    const L = this._lightning, ctx = this.ctx;
+    if (L.flash > 0) {
+      ctx.save(); ctx.globalCompositeOperation = 'lighter';
+      ctx.fillStyle = `rgba(200,215,255,${Math.min(0.7, L.flash * 0.7)})`;
+      ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+      ctx.restore();
+    }
+    if (L.boltT > 0 && L.bolt) {
+      ctx.save();
+      ctx.strokeStyle = 'rgba(235,240,255,0.95)'; ctx.lineWidth = 3; ctx.lineJoin = 'round';
+      ctx.shadowColor = 'rgba(180,200,255,0.9)'; ctx.shadowBlur = 16;
+      ctx.beginPath(); ctx.moveTo(L.bolt[0].x, L.bolt[0].y);
+      for (const pt of L.bolt) ctx.lineTo(pt.x, pt.y);
+      ctx.stroke();
+      ctx.restore();
+    }
   }
 
   _renderOverworld() {
@@ -736,6 +887,9 @@ export class Game {
       Sprites.window(ctx, (b.x + b.w - 1) * TILE - cam.x, fy);
       if (b.type === 'deco') Sprites.door(ctx, (b.x + (b.w / 2 | 0)) * TILE - cam.x, fy);
     }
+
+    // Ombres de nuages qui défilent (au-dessus du sol, sous les entités)
+    this._renderClouds();
 
     const drawables = [];
     for (let gy = sy0; gy < sy1; gy++) for (let gx = sx0; gx < sx1; gx++)
@@ -843,7 +997,7 @@ export class Game {
   }
 
   _renderWeather() {
-    if (!this._weatherKind) return;
+    if (!this._weatherKind || this.scene !== 'overworld') return;
     const ctx = this.ctx;
     if (this._weatherKind === 'rain') {
       ctx.strokeStyle = 'rgba(150,180,230,0.5)'; ctx.lineWidth = 1.5;
@@ -884,6 +1038,106 @@ export class Game {
     // (les halos chauds sont désormais gérés par le bloom émissif de PostFX)
   }
 
+  // ---------------- Écran-titre animé ----------------
+  startTitle() {
+    // étoiles fixes scintillantes
+    this._titleStars = [];
+    for (let i = 0; i < 90; i++) this._titleStars.push({ x: Math.random(), y: Math.random() * 0.55, ph: rand(0, 6.28), sp: rand(1.5, 4) });
+    this._titleClouds = [];
+    for (let i = 0; i < 5; i++) this._titleClouds.push({ x: rand(0, 1), y: rand(0.12, 0.4), s: rand(0.006, 0.014), w: rand(90, 190) });
+    this._titleFire = [];
+    for (let i = 0; i < 24; i++) this._titleFire.push({ x: Math.random(), y: rand(0.55, 1), ph: rand(0, 6.28) });
+    this.titleActive = true;
+    this._titleT = 0; this._titleLast = 0;
+    document.body.classList.add('in-title');
+    requestAnimationFrame((t) => this._titleLoop(t));
+  }
+  stopTitle() { this.titleActive = false; document.body.classList.remove('in-title'); }
+
+  _titleLoop(ts) {
+    if (!this.titleActive) return;
+    if (!this._titleLast) this._titleLast = ts;
+    const dt = Math.min(0.05, (ts - this._titleLast) / 1000);
+    this._titleLast = ts; this._titleT += dt;
+    this._renderTitle(dt);
+    requestAnimationFrame((t) => this._titleLoop(t));
+  }
+
+  _renderTitle(dt) {
+    const ctx = this.ctx, W = this.canvas.width, H = this.canvas.height, t = this._titleT;
+    // ciel crépusculaire
+    const sky = ctx.createLinearGradient(0, 0, 0, H);
+    sky.addColorStop(0, '#140a2e'); sky.addColorStop(0.4, '#3b2560'); sky.addColorStop(0.62, '#8a4a5a'); sky.addColorStop(0.72, '#e8894a');
+    sky.addColorStop(0.74, '#3a6b3a'); sky.addColorStop(1, '#1f3a24');
+    ctx.fillStyle = sky; ctx.fillRect(0, 0, W, H);
+    const horizon = H * 0.72;
+
+    // étoiles
+    for (const s of this._titleStars) {
+      const a = 0.4 + Math.sin(t * s.sp + s.ph) * 0.4;
+      ctx.globalAlpha = Math.max(0, a); ctx.fillStyle = '#fff';
+      ctx.fillRect(s.x * W, s.y * horizon, 2, 2);
+    }
+    ctx.globalAlpha = 1;
+
+    // grosse lune avec halo
+    const mx = W * 0.76, my = horizon * 0.42;
+    ctx.save(); ctx.globalCompositeOperation = 'lighter';
+    const halo = ctx.createRadialGradient(mx, my, 10, mx, my, 150);
+    halo.addColorStop(0, 'rgba(255,225,180,0.5)'); halo.addColorStop(1, 'rgba(255,225,180,0)');
+    ctx.fillStyle = halo; ctx.beginPath(); ctx.arc(mx, my, 150, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+    ctx.fillStyle = '#ffe9c0'; ctx.beginPath(); ctx.arc(mx, my, 46, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = 'rgba(210,180,140,0.5)';
+    ctx.beginPath(); ctx.arc(mx - 14, my - 8, 8, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(mx + 12, my + 10, 6, 0, Math.PI * 2); ctx.fill();
+
+    // nuages
+    for (const c of this._titleClouds) {
+      c.x += c.s * dt * 6; if (c.x > 1.2) c.x = -0.2;
+      const cx = c.x * W, cy = c.y * horizon;
+      ctx.fillStyle = 'rgba(60,40,80,0.5)';
+      ctx.beginPath(); ctx.ellipse(cx, cy, c.w, c.w * 0.4, 0, 0, Math.PI * 2);
+      ctx.ellipse(cx + c.w * 0.6, cy + 6, c.w * 0.7, c.w * 0.32, 0, 0, Math.PI * 2); ctx.fill();
+    }
+
+    // collines en couches (parallaxe douce)
+    const hill = (baseY, amp, colr, phase) => {
+      ctx.fillStyle = colr; ctx.beginPath(); ctx.moveTo(0, H);
+      for (let x = 0; x <= W; x += 12) ctx.lineTo(x, baseY + Math.sin(x * 0.006 + phase) * amp);
+      ctx.lineTo(W, H); ctx.closePath(); ctx.fill();
+    };
+    hill(horizon + 20, 18, '#2f5230', 0.5 + t * 0.05);
+    hill(horizon + 70, 26, '#25401f', 1.7 - t * 0.04);
+    hill(horizon + 130, 34, '#1a2e16', 3.0 + t * 0.03);
+
+    // arbres silhouettes sur la première colline
+    const treeSil = (x, y, s) => {
+      ctx.fillStyle = '#132611';
+      ctx.fillRect(x - 2 * s, y, 4 * s, 14 * s);
+      ctx.beginPath(); ctx.arc(x, y - 2 * s, 12 * s, 0, Math.PI * 2);
+      ctx.arc(x - 9 * s, y + 3 * s, 8 * s, 0, Math.PI * 2);
+      ctx.arc(x + 9 * s, y + 3 * s, 8 * s, 0, Math.PI * 2); ctx.fill();
+    };
+    treeSil(W * 0.12, horizon + 40, 1.1); treeSil(W * 0.30, horizon + 55, 0.9);
+    treeSil(W * 0.62, horizon + 48, 1.0); treeSil(W * 0.88, horizon + 60, 1.2);
+
+    // lucioles au premier plan
+    for (const f of this._titleFire) {
+      f.ph += dt * rand(1, 2.4); f.x += Math.sin(f.ph) * 0.0006;
+      const a = 0.4 + Math.sin(f.ph) * 0.4;
+      ctx.save(); ctx.globalCompositeOperation = 'lighter';
+      const fx = f.x * W, fy = f.y * H;
+      const g = ctx.createRadialGradient(fx, fy, 1, fx, fy, 14);
+      g.addColorStop(0, `rgba(200,255,140,${a})`); g.addColorStop(1, 'rgba(200,255,140,0)');
+      ctx.fillStyle = g; ctx.beginPath(); ctx.arc(fx, fy, 14, 0, Math.PI * 2); ctx.fill();
+      ctx.restore();
+    }
+
+    // vignette
+    this.postfx.vignette(ctx, 0.4);
+  }
+
   // ---------------- Boucle ----------------
   loop(ts) {
     if (!this.running) return;
@@ -897,8 +1151,12 @@ export class Game {
   }
 
   start() {
+    this.stopTitle();
     this.init();
     this.running = true;
+    this.lastTime = 0;
+    this.music.setScene('farm');
+    this.music.start();
     requestAnimationFrame((t) => this.loop(t));
   }
 }
