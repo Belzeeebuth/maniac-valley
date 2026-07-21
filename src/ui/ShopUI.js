@@ -6,7 +6,7 @@
 import { ITEMS } from '../systems/Inventory.js';
 import { Sprites } from '../graphics/SpriteSheetGenerator.js';
 
-const BUYABLE = ['seed_wheat', 'seed_strawberry', 'seed_pumpkin', 'seed_tomato', 'hay'];
+const BUYABLE = ['seed_wheat', 'seed_strawberry', 'seed_pumpkin', 'seed_tomato', 'seed_carrot', 'seed_corn', 'seed_blueberry', 'hay', 'fishingrod'];
 
 export class ShopUI {
   constructor(game) {
@@ -16,7 +16,10 @@ export class ShopUI {
     this.tab = 'buy';
   }
 
-  buyPrice(id) { return Math.max(2, (ITEMS[id].sell || 3) * 3); }
+  buyPrice(id) {
+    if (id === 'fishingrod') return 150;
+    return Math.max(2, (ITEMS[id].sell || 3) * 3);
+  }
 
   render() {
     const g = this.game;

@@ -1,5 +1,6 @@
 // ============================================================================
-// main.js — point d'entrée : instancie le jeu et démarre au clic sur COMMENCER.
+// main.js — point d'entrée : instancie le jeu, gère Nouvelle partie /
+// Continuer (sauvegarde LocalStorage) et démarre depuis l'écran-titre.
 // ============================================================================
 
 import { Game } from './engine/Game.js';
@@ -15,10 +16,23 @@ window.Sprites = Sprites;
 game.startTitle();
 
 const startScreen = document.getElementById('startScreen');
-document.getElementById('startButton').addEventListener('click', () => {
+const startBtn = document.getElementById('startButton');
+const continueBtn = document.getElementById('continueButton');
+
+if (game.saves.hasSave()) {
+  continueBtn.style.display = 'block';
+  startBtn.textContent = '▶ NOUVELLE PARTIE';
+}
+
+startBtn.addEventListener('click', () => {
   SoundFX.ensure();
   startScreen.style.display = 'none';
-  game.start();
+  game.start(false);
+});
+continueBtn.addEventListener('click', () => {
+  SoundFX.ensure();
+  startScreen.style.display = 'none';
+  game.start(true);
 });
 
 // Réactive le contexte audio au premier geste utilisateur (politique navigateur).

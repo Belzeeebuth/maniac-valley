@@ -16,7 +16,7 @@ export class Tooltip {
     const rar = RARITY[it.rarity || 'common'];
     const typeLabel = {
       tool: 'Outil', material: 'Matériau', ore: 'Minerai', seed: 'Graine',
-      crop: 'Récolte', product: 'Produit', food: 'Nourriture',
+      crop: 'Récolte', product: 'Produit', food: 'Nourriture', fish: 'Poisson',
       placeable: 'Construction', upgrade_token: 'Amélioration',
     }[it.type] || 'Objet';
     const stats = itemStats(id).map(s => `<div class="tt-stat">${s}</div>`).join('');

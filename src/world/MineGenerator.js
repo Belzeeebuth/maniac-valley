@@ -6,11 +6,20 @@
 // ============================================================================
 
 import { TILE, MT, TileMap, makeGrid } from './TileMap.js';
+// (biomeFor / BIOMES définis plus bas, exportés pour le rendu et Game)
 import { makeEnemy } from '../entities/Enemy.js';
 import { makeGigaSlime, makeMoleKing } from '../entities/Boss.js';
 
 export const MINE_W = 26, MINE_H = 20;
 export const MAX_FLOOR = 15;
+
+// Biomes par profondeur : palettes et dangers distincts.
+export const BIOMES = {
+  rock: { name: 'Roche',  floorA: '#43392f', floorB: '#3d342b', wallEdge: '#211b16', wallFace: '#4a4038', wallHi: '#5a4d3f', grade: [{ op: 'multiply', color: '#28324a', alpha: 0.34 }, { op: 'soft-light', color: '#1e3e50', alpha: 0.40 }] },
+  ice:  { name: 'Glace',  floorA: '#3a4a5c', floorB: '#344254', wallEdge: '#1a2430', wallFace: '#4c6478', wallHi: '#6c8ca4', grade: [{ op: 'multiply', color: '#2a3a5c', alpha: 0.34 }, { op: 'soft-light', color: '#3a6a9a', alpha: 0.40 }] },
+  lava: { name: 'Lave',   floorA: '#4a2f24', floorB: '#42291f', wallEdge: '#2a140c', wallFace: '#5c3a2c', wallHi: '#7a4a34', grade: [{ op: 'multiply', color: '#4a2018', alpha: 0.34 }, { op: 'soft-light', color: '#8a3a1a', alpha: 0.40 }] },
+};
+export function biomeFor(level) { return level <= 5 ? 'rock' : level <= 10 ? 'ice' : 'lava'; }
 
 let uid = 100000;
 const nid = () => uid++;
@@ -97,10 +106,24 @@ export function generateMine(level) {
     boss = level === 5 ? makeGigaSlime(bx, by) : makeMoleKing(bx, by);
   }
 
+  // Pièges : piques partout, flaques de lave dans le biome Lave,
+  // plaques de glace glissantes dans le biome Glace.
+  const biome = biomeFor(level);
+  const traps = [];
+  const trapSpots = floors.filter(t => !(t.x === far.x && t.y === far.y));
+  const nTraps = 2 + Math.floor(level / 2);
+  for (let i = 0; i < nTraps && trapSpots.length; i++) {
+    const t = trapSpots.splice(Math.random() * trapSpots.length | 0, 1)[0];
+    let type = 'spikes';
+    if (biome === 'lava' && Math.random() < 0.5) type = 'lava';
+    else if (biome === 'ice' && Math.random() < 0.5) type = 'ice';
+    traps.push({ gx: t.x, gy: t.y, type, cd: 0, ph: Math.random() * 6.28 });
+  }
+
   return {
-    level, tilemap: new TileMap(grid, 'mine'), hp,
+    level, biome, tilemap: new TileMap(grid, 'mine'), hp,
     w: MINE_W, h: MINE_H, entrance, stairsPos: far,
     isBoss, stairsUnlocked: !isBoss,
-    enemies, boss, placed: [], ground: [], id: nid(),
+    enemies, boss, traps, placed: [], ground: [], id: nid(),
   };
 }

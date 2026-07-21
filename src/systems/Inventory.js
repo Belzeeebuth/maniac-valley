@@ -20,6 +20,7 @@ export const ITEMS = {
   axe:         { name: 'Hache',    type: 'tool', tool: 'axe',   stack: 1, rarity: 'common', desc: 'Coupe les arbres.' },
   pickaxe:     { name: 'Pioche',   type: 'tool', tool: 'pickaxe', stack: 1, rarity: 'common', desc: 'Casse rochers et minerais.' },
   sword:       { name: 'Épée',     type: 'tool', tool: 'sword', stack: 1, rarity: 'common', desc: 'Arme de mêlée.' },
+  fishingrod:  { name: 'Canne à pêche', type: 'tool', tool: 'fish', stack: 1, rarity: 'rare', desc: 'Lancez près de l\'eau et visez juste !' },
 
   // Matériaux & minerais
   wood:      { name: 'Bois',            type: 'material', stack: 99, sell: 2,  rarity: 'common' },
@@ -38,12 +39,24 @@ export const ITEMS = {
   seed_strawberry: { name: 'Graine de Fraise',     type: 'seed', cropId: 'strawberry', stack: 99, sell: 7,  rarity: 'common' },
   seed_pumpkin:    { name: 'Graine de Citrouille', type: 'seed', cropId: 'pumpkin',    stack: 99, sell: 10, rarity: 'rare' },
   seed_tomato:     { name: 'Graine de Tomate',     type: 'seed', cropId: 'tomato',     stack: 99, sell: 6,  rarity: 'common' },
+  seed_carrot:     { name: 'Graine de Carotte',    type: 'seed', cropId: 'carrot',     stack: 99, sell: 3,  rarity: 'common' },
+  seed_corn:       { name: 'Graine de Maïs',       type: 'seed', cropId: 'corn',       stack: 99, sell: 9,  rarity: 'rare' },
+  seed_blueberry:  { name: 'Graine de Myrtille',   type: 'seed', cropId: 'blueberry',  stack: 99, sell: 8,  rarity: 'rare' },
 
   // Récoltes (comestibles)
   crop_wheat:      { name: 'Blé',        type: 'crop', cropId: 'wheat',      stack: 99, sell: CROPS.wheat.sell,      rarity: 'common', food: CROPS.wheat.food },
   crop_strawberry: { name: 'Fraise',     type: 'crop', cropId: 'strawberry', stack: 99, sell: CROPS.strawberry.sell, rarity: 'rare',   food: CROPS.strawberry.food },
   crop_pumpkin:    { name: 'Citrouille', type: 'crop', cropId: 'pumpkin',    stack: 99, sell: CROPS.pumpkin.sell,    rarity: 'epic',   food: CROPS.pumpkin.food },
   crop_tomato:     { name: 'Tomate',     type: 'crop', cropId: 'tomato',     stack: 99, sell: CROPS.tomato.sell,     rarity: 'common', food: CROPS.tomato.food },
+  crop_carrot:     { name: 'Carotte',    type: 'crop', cropId: 'carrot',     stack: 99, sell: CROPS.carrot.sell,     rarity: 'common', food: CROPS.carrot.food },
+  crop_corn:       { name: 'Maïs',       type: 'crop', cropId: 'corn',       stack: 99, sell: CROPS.corn.sell,       rarity: 'rare',   food: CROPS.corn.food },
+  crop_blueberry:  { name: 'Myrtille',   type: 'crop', cropId: 'blueberry',  stack: 99, sell: CROPS.blueberry.sell,  rarity: 'rare',   food: CROPS.blueberry.food },
+
+  // Poissons (pêche)
+  fish_perch: { name: 'Perche',       type: 'fish', stack: 99, sell: 18, rarity: 'common', food: { hunger: 16, hp: 4, stam: 8 } },
+  fish_carp:  { name: 'Carpe',        type: 'fish', stack: 99, sell: 14, rarity: 'common', food: { hunger: 14, hp: 3, stam: 6 } },
+  fish_trout: { name: 'Truite',       type: 'fish', stack: 99, sell: 32, rarity: 'rare',   food: { hunger: 22, hp: 8, stam: 12 } },
+  fish_king:  { name: 'Poisson Roi',  type: 'fish', stack: 99, sell: 120, rarity: 'maniac', food: { hunger: 40, hp: 25, stam: 30 }, desc: 'La légende du lac maniaque.' },
 
   // Produits animaux
   egg:  { name: 'Œuf',  type: 'product', stack: 99, sell: 10, rarity: 'common', food: { hunger: 10, hp: 2, stam: 5 } },

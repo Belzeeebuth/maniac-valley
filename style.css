@@ -296,6 +296,39 @@ body.in-title .scene-label { display: none !important; }
 .classic-link { margin-top: 24px; font-size: 18px; color: #7a8aa0; text-decoration: none; }
 .classic-link:hover { color: var(--gold); }
 
+/* ---------- Contrôles tactiles ---------- */
+#touchControls { display: none; }
+body.touch #touchControls { display: block; }
+body.touch.in-title #touchControls { display: none; }
+#touchJoystick {
+  position: absolute; left: 20px; bottom: 90px; width: 120px; height: 120px;
+  border-radius: 50%; background: rgba(30,20,12,0.5); border: 3px solid var(--wood);
+  pointer-events: auto; touch-action: none;
+}
+#touchKnob {
+  position: absolute; left: 50%; top: 50%; width: 52px; height: 52px;
+  margin: -26px 0 0 -26px; border-radius: 50%;
+  background: var(--wood-light); border: 3px solid var(--wood-dark);
+  box-shadow: 0 3px 6px rgba(0,0,0,0.5);
+}
+#touchButtons {
+  position: absolute; right: 20px; bottom: 96px; display: flex; gap: 14px; align-items: flex-end;
+  pointer-events: auto;
+}
+#touchButtons button {
+  width: 64px; height: 64px; border-radius: 50%; font-size: 26px;
+  background: rgba(58,36,18,0.8); color: var(--gold);
+  border: 3px solid var(--wood-light); touch-action: none;
+}
+#touchDodge { width: 52px !important; height: 52px !important; font-size: 20px !important; opacity: 0.9; }
+
+#continueButton {
+  font-family: var(--font-pixel); font-size: 16px; padding: 14px 36px; cursor: pointer;
+  color: #9fdc9f; background: var(--wood-dark); border: 3px solid #4a8a4a; border-radius: 8px;
+  letter-spacing: 2px; margin-bottom: 14px;
+}
+#continueButton:hover { background: #2a4a2a; }
+
 /* Scrollbars */
 ::-webkit-scrollbar { width: 10px; }
 ::-webkit-scrollbar-thumb { background: var(--wood); border-radius: 5px; }

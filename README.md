@@ -31,12 +31,16 @@ Le jeu existe aussi en un **unique `public/classic.html`** ouvrable directement 
 ## 🕹️ Fonctionnalités
 
 - **Monde & zones** : ferme, village (boutique + panneau de quêtes) et entrée de mine, caméra à défilement fluide, collisions strictes.
-- **Village vivant** : plusieurs maisons aux toits colorés et des **habitants (PNJ)** regroupés en foyers (seul, couple, famille, aîné) qui déambulent avec une IA simple, se tournent vers vous et **vous saluent** ; fenêtres allumées la nuit.
+- **Village vivant** : plusieurs maisons aux toits colorés et des **habitants nommés** regroupés en foyers (seul, couple, famille, aîné) qui déambulent avec une IA simple ; fenêtres allumées la nuit.
+- **Amitié & cadeaux** : chaque villageois a une jauge de cœurs (♥) ; parlez-leur chaque jour (+2) ou offrez-leur un objet (+8, +15 pour la nourriture/récoltes/poissons, 1 cadeau/jour) — leurs **dialogues évoluent** avec votre relation.
+- **Pêche** 🎣 : canne à pêche (boutique ou fabrication), lancer sur l'eau visée, attendre la touche (« ! ») puis réussir le **mini-jeu de timing** (curseur dans la zone verte) — 4 poissons dont le légendaire *Poisson Roi*, la précision augmente la rareté.
+- **Sauvegarde automatique** (LocalStorage) : à chaque nuit, toutes les 45 s et à la fermeture ; bouton **CONTINUER** sur l'écran-titre. Monde, inventaire, quêtes, amitiés et progression sont persistés.
+- **Biomes de mine** : Roche (1-5), **Glace** (6-10, plaques glissantes) et **Lave** (11-15, flaques incandescentes) avec palettes et ambiances dédiées, plus des **pièges** (piques, lave) qui punissent l'inattention.
 - **Ciblage à la souris** : labourer, arroser, planter, miner et construire **sur la tuile pointée par le curseur** (le joueur se tourne vers elle), jusqu'à **2 cases** de portée, avec réticule de visée vert/rouge.
 - **Cycle jour/nuit** en temps réel (06:00 → 02:00), teinte d'ambiance progressive et halo de lumière autour du joueur et des torches.
 - **Saisons & météo** : 4 saisons (28 jours chacune) qui conditionnent les cultures plantables ; météo dynamique (soleil, pluie qui arrose les champs, neige, et **éclipse maniaque** qui renforce les ennemis).
 - **Survie** : jauges de Santé, Énergie, Faim, or à gagner/dépenser ; évanouissement et réveil le lendemain avec perte d'or.
-- **Agriculture** : labourer, arroser, planter (blé, fraise, citrouille, tomate — selon la saison) et récolter au fil des stades de pousse.
+- **Agriculture** : labourer, arroser, planter (**7 cultures** : blé, fraise, citrouille, tomate, carotte, maïs, myrtille — selon la saison) et récolter au fil des stades de pousse.
 - **Élevage** : poules & vaches avec IA d'errance ; nourries au foin, elles produisent œufs et lait chaque jour.
 - **Fabrication & construction** : clôtures, coffres, fourneau, épouvantail, torches, forge de lingots, cuisine et améliorations d'outils par paliers, avec prévisualisation de placement verte/rouge.
 - **Mines procédurales** : 15 étages générés aléatoirement (veines de cuivre/fer/or/diamant, escaliers), combat à l'épée (hitbox orientée, coups **critiques**, recul, i-frames, dégâts flottants) contre slimes, squelettes et chauves-souris.
@@ -82,5 +86,7 @@ maniac-valley/
 
 ## 🛠️ Technique
 - **Vanilla JavaScript (ES Modules)** — aucune bibliothèque de jeu, bundlé par Vite.
-- **Rendu Canvas 2D** : tous les sprites (joueur, tuiles, plantes, animaux, monstres, boss, objets) dessinés par le code.
-- **Audio Web Audio API** : chaque effet sonore synthétisé à la volée (oscillateurs + bruit filtré).
+- **Architecture en gestionnaires** : `Game.js` (orchestrateur) délègue à `SceneManager` (monde/scènes), `RenderManager` (pipeline de rendu) et `SaveManager` (persistance LocalStorage).
+- **Rendu Canvas 2D** : tous les sprites dessinés par le code, avec **cache offscreen des tuiles statiques** (herbe, chemins, murs, sols/minerais de mine) blittées via `drawImage` pour la performance.
+- **Entrées multi-supports** : clavier/souris, **tactile** (joystick virtuel + boutons d'action/esquive sur mobile) et **manette** (Gamepad API : stick = déplacement, A = action, B = esquive, LB/RB = hotbar, Start = inventaire).
+- **Audio Web Audio API** : effets sonores et musique d'ambiance générative synthétisés à la volée.

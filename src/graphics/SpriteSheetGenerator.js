@@ -341,31 +341,58 @@ export const Sprites = {
     c.fillStyle = 'rgba(255,240,150,0.25)'; circ(c, x + 16, y + 13, 11, 'rgba(255,240,150,0.12)');
   },
 
-  // ================= Tuiles mine =================
-  mineFloor(c, x, y, v, gx = 0, gy = 0) {
-    rect(c, x, y, TILE, TILE, ((gx + gy) & 1) ? '#43392f' : '#3d342b');
+  // ================= Tuiles mine (avec biomes) =================
+  mineFloor(c, x, y, v, gx = 0, gy = 0, biome = null) {
+    const a = biome ? biome.floorA : '#43392f', b = biome ? biome.floorB : '#3d342b';
+    rect(c, x, y, TILE, TILE, ((gx + gy) & 1) ? a : b);
     c.fillStyle = 'rgba(0,0,0,0.12)';
     const h = hash(gx, gy);
     if (h < 0.4) c.fillRect(x + (h * 20 | 0), y + 8 + (h * 12 | 0), 4, 3);
     if (h > 0.85) circ(c, x + 8 + h * 14, y + 20, 1.4, 'rgba(255,255,255,0.06)');
   },
-  mineWall(c, x, y) {
-    rect(c, x, y, TILE, TILE, '#211b16');
-    rect(c, x + 1, y + 1, TILE - 2, TILE - 2, '#43392f');
-    rect(c, x + 1, y + 1, TILE - 2, 2, '#5a4d3f'); // arête éclairée haut
-    rect(c, x + 1, y + TILE - 3, TILE - 2, 2, '#2a231c'); // ombre bas
-    c.fillStyle = 'rgba(0,0,0,0.25)'; rect(c, x + 5, y + 12, TILE - 12, 3); rect(c, x + 3, y + 20, 10, 2);
+  mineWall(c, x, y, biome = null) {
+    const edge = biome ? biome.wallEdge : '#211b16', face = biome ? biome.wallFace : '#43392f', hi = biome ? biome.wallHi : '#5a4d3f';
+    rect(c, x, y, TILE, TILE, edge);
+    rect(c, x + 1, y + 1, TILE - 2, TILE - 2, face);
+    rect(c, x + 1, y + 1, TILE - 2, 2, hi); // arête éclairée haut
+    c.fillStyle = 'rgba(0,0,0,0.25)';
+    rect(c, x + 1, y + TILE - 3, TILE - 2, 2, 'rgba(0,0,0,0.3)'); // ombre bas
+    c.fillStyle = 'rgba(0,0,0,0.25)'; c.fillRect(x + 5, y + 12, TILE - 12, 3); c.fillRect(x + 3, y + 20, 10, 2);
   },
-  mineOre(c, x, y, kind) {
-    Sprites.mineWall(c, x, y);
+  // Pièges de mine
+  trap(c, x, y, type, t) {
+    if (type === 'spikes') {
+      c.fillStyle = '#8a8a92';
+      for (let i = 0; i < 4; i++) {
+        const sx = x + 4 + i * 7;
+        c.beginPath(); c.moveTo(sx, y + 26); c.lineTo(sx + 3, y + 10); c.lineTo(sx + 6, y + 26); c.closePath(); c.fill();
+      }
+      c.fillStyle = '#c8c8d0';
+      for (let i = 0; i < 4; i++) { const sx = x + 4 + i * 7; c.fillRect(sx + 2, y + 12, 1.5, 6); }
+    } else if (type === 'lava') {
+      rect(c, x + 2, y + 2, TILE - 4, TILE - 4, '#c93a10');
+      const g2 = 0.5 + Math.sin(t * 4 + x) * 0.3;
+      c.fillStyle = `rgba(255,180,40,${g2})`;
+      circ(c, x + 10, y + 12, 4, `rgba(255,170,40,${g2})`);
+      circ(c, x + 22, y + 20, 5, `rgba(255,140,30,${g2 * 0.8})`);
+      c.fillStyle = '#7a1a00'; c.fillRect(x + 2, y + 2, TILE - 4, 2);
+    } else if (type === 'ice') {
+      rect(c, x + 2, y + 2, TILE - 4, TILE - 4, 'rgba(160,210,240,0.55)');
+      c.strokeStyle = 'rgba(255,255,255,0.6)'; c.lineWidth = 1;
+      c.beginPath(); c.moveTo(x + 6, y + 8); c.lineTo(x + 16, y + 18); c.lineTo(x + 12, y + 26); c.stroke();
+      c.beginPath(); c.moveTo(x + 22, y + 6); c.lineTo(x + 18, y + 14); c.stroke();
+    }
+  },
+  mineOre(c, x, y, kind, biome = null) {
+    Sprites.mineWall(c, x, y, biome);
     const P = { copper: ['#c9743a', '#e0985a'], iron: ['#b6b6c6', '#dcdcea'], gold: ['#e6b820', '#ffe680'], diamond: ['#5fd8cf', '#bff5f0'] }[kind];
     const spots = [[11, 13, 4], [21, 20, 4], [17, 9, 3], [9, 22, 2.5]];
     for (const [sx, sy, r] of spots) { circ(c, x + sx, y + sy, r, P[0]); circ(c, x + sx - 1, y + sy - 1, r * 0.5, P[1]); }
     // scintillement
     if (kind === 'diamond' || kind === 'gold') { c.fillStyle = 'rgba(255,255,255,0.7)'; rect(c, x + 10, y + 11, 1.5, 1.5); }
   },
-  mineEntranceTile(c, x, y, gx = 0, gy = 0) {
-    Sprites.mineFloor(c, x, y, 0, gx, gy);
+  mineEntranceTile(c, x, y, gx = 0, gy = 0, biome = null) {
+    Sprites.mineFloor(c, x, y, 0, gx, gy, biome);
     c.fillStyle = 'rgba(255,235,180,0.16)'; circ(c, x + 16, y + 16, 13, 'rgba(255,235,180,0.14)');
     rect(c, x + 4, y + 2, 24, 3, '#5a3d24'); // poutre
   },
@@ -590,6 +617,78 @@ export const Sprites = {
   },
 };
 
+// ============================================================================
+// TileCache — mise en cache offscreen des tuiles statiques. Les tuiles dont le
+// dessin est déterministe (herbe, chemin, sols/murs de mine, terre) sont
+// rendues une seule fois par clé puis blittées via drawImage : le gros des
+// fillRect/arc par frame disparaît. Les tuiles animées (eau, torche, fourneau)
+// restent dessinées en direct.
+// ============================================================================
+const _tileCache = new Map();
+const TILE_CACHE_MAX = 512;
+
+export function cachedTile(key, drawFn) {
+  let cv = _tileCache.get(key);
+  if (!cv) {
+    if (_tileCache.size > TILE_CACHE_MAX) _tileCache.clear();
+    cv = document.createElement('canvas');
+    cv.width = TILE; cv.height = TILE;
+    const c = cv.getContext('2d');
+    c.imageSmoothingEnabled = false;
+    drawFn(c);
+    _tileCache.set(key, cv);
+  }
+  return cv;
+}
+export function clearTileCache() { _tileCache.clear(); }
+
+// Blitters pratiques : la variation par tuile est repliée sur un motif 8x8
+// (visuel identique à l'oeil, nombre de variantes borné → cache efficace).
+export const CachedTiles = {
+  // Coordonnées synthétiques : motif 8x8 + correction pour préserver la
+  // parité du damier ((sx+sy)&1 identique à (gx+gy)&1) en un seul dessin.
+  _syn(gx, gy) {
+    const kx = gx & 7, ky = gy & 7;
+    const parity = (gx + gy) & 1;
+    const sx = ((kx + ky) & 1) === parity ? kx : kx + 8;
+    return { sx, sy: ky };
+  },
+  grass(ctx, x, y, season, gx, gy) {
+    const { sx, sy } = CachedTiles._syn(gx, gy);
+    const cv = cachedTile(`g:${season}:${sx}:${sy}`, (c) => Sprites.grass(c, 0, 0, 0, season, sx, sy));
+    ctx.drawImage(cv, x | 0, y | 0);
+  },
+  mineFloor(ctx, x, y, biome, biomeKey, gx, gy) {
+    const { sx, sy } = CachedTiles._syn(gx, gy);
+    const cv = cachedTile(`mf:${biomeKey}:${sx}:${sy}`, (c) => Sprites.mineFloor(c, 0, 0, 0, sx, sy, biome));
+    ctx.drawImage(cv, x | 0, y | 0);
+  },
+  mineWall(ctx, x, y, biome, biomeKey) {
+    const cv = cachedTile(`mw:${biomeKey}`, (c) => Sprites.mineWall(c, 0, 0, biome));
+    ctx.drawImage(cv, x | 0, y | 0);
+  },
+  mineOre(ctx, x, y, kind, biome, biomeKey) {
+    const cv = cachedTile(`mo:${biomeKey}:${kind}`, (c) => Sprites.mineOre(c, 0, 0, kind, biome));
+    ctx.drawImage(cv, x | 0, y | 0);
+  },
+  farmland(ctx, x, y, wet) {
+    const cv = cachedTile(`fl:${wet ? 1 : 0}`, (c) => Sprites.farmland(c, 0, 0, wet));
+    ctx.drawImage(cv, x | 0, y | 0);
+  },
+  fence(ctx, x, y) {
+    const cv = cachedTile('fence', (c) => Sprites.fence(c, 0, 0));
+    ctx.drawImage(cv, x | 0, y | 0);
+  },
+  rock(ctx, x, y) {
+    const cv = cachedTile('rock', (c) => Sprites.rock(c, 0, 0));
+    ctx.drawImage(cv, x | 0, y | 0);
+  },
+  wall(ctx, x, y, roof, roofCol) {
+    const cv = cachedTile(`w:${roof ? 1 : 0}:${roofCol || ''}`, (c) => Sprites.wall(c, 0, 0, roof, roofCol));
+    ctx.drawImage(cv, x | 0, y | 0);
+  },
+};
+
 function ir(c, x, y, w, h, col) { c.fillStyle = col; c.fillRect(x, y, w, h); }
 function icc(c, x, y, r, col) { c.fillStyle = col; c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2); c.fill(); }
 
@@ -629,5 +728,16 @@ const ICON = {
   sword_upgrade(c, s) { ir(c, s * .46, s * .1, s * .08, s * .6, '#ffe066'); ir(c, s * .46, s * .1, s * .03, s * .6, '#fff6c0'); ir(c, s * .3, s * .65, s * .4, s * .1, '#8a6a3a'); c.fillStyle = '#fff8c0'; c.beginPath(); c.arc(s * .5, s * .16, s * .06, 0, Math.PI * 2); c.fill(); },
   pickaxe_upgrade(c, s) { ir(c, s * .46, s * .2, s * .08, s * .6, '#ffe066'); ir(c, s * .2, s * .12, s * .6, s * .14, '#ffd700'); ir(c, s * .2, s * .12, s * .6, s * .05, '#fff4a0'); },
   axe_upgrade(c, s) { ir(c, s * .46, s * .15, s * .08, s * .6, '#ffe066'); icc(c, s * .5, s * .2, s * .18, '#ffd700'); icc(c, s * .46, s * .17, s * .1, '#fff4a0'); },
+  fishingrod(c, s) { c.strokeStyle = '#8a6a3a'; c.lineWidth = s * .07; c.beginPath(); c.moveTo(s * .2, s * .85); c.lineTo(s * .72, s * .18); c.stroke(); c.strokeStyle = '#dcdce4'; c.lineWidth = 1; c.beginPath(); c.moveTo(s * .72, s * .18); c.lineTo(s * .78, s * .6); c.stroke(); icc(c, s * .78, s * .64, s * .06, '#e33'); },
+  fish_perch(c, s) { c.fillStyle = '#7a9a5a'; c.beginPath(); c.ellipse(s * .48, s * .55, s * .28, s * .15, -0.2, 0, Math.PI * 2); c.fill(); c.fillStyle = '#5a7a3a'; c.beginPath(); c.moveTo(s * .72, s * .5); c.lineTo(s * .86, s * .4); c.lineTo(s * .86, s * .64); c.closePath(); c.fill(); icc(c, s * .32, s * .5, s * .03, '#111'); },
+  fish_carp(c, s) { c.fillStyle = '#b8935a'; c.beginPath(); c.ellipse(s * .48, s * .55, s * .3, s * .18, -0.15, 0, Math.PI * 2); c.fill(); c.fillStyle = '#93703a'; c.beginPath(); c.moveTo(s * .74, s * .5); c.lineTo(s * .9, s * .38); c.lineTo(s * .9, s * .66); c.closePath(); c.fill(); icc(c, s * .3, s * .5, s * .03, '#111'); },
+  fish_trout(c, s) { c.fillStyle = '#7a9ac4'; c.beginPath(); c.ellipse(s * .48, s * .55, s * .3, s * .16, -0.2, 0, Math.PI * 2); c.fill(); c.fillStyle = '#e88aa0'; ir(c, s * .3, s * .5, s * .34, s * .05); c.fillStyle = '#5a7aa4'; c.beginPath(); c.moveTo(s * .74, s * .5); c.lineTo(s * .9, s * .38); c.lineTo(s * .9, s * .66); c.closePath(); c.fill(); icc(c, s * .3, s * .5, s * .03, '#111'); },
+  fish_king(c, s) { c.fillStyle = '#e0bc30'; c.beginPath(); c.ellipse(s * .48, s * .58, s * .3, s * .18, -0.15, 0, Math.PI * 2); c.fill(); c.fillStyle = '#a8871a'; c.beginPath(); c.moveTo(s * .74, s * .53); c.lineTo(s * .9, s * .4); c.lineTo(s * .9, s * .7); c.closePath(); c.fill(); c.fillStyle = '#ffd700'; c.beginPath(); c.moveTo(s * .34, s * .34); c.lineTo(s * .4, s * .2); c.lineTo(s * .46, s * .32); c.lineTo(s * .52, s * .2); c.lineTo(s * .58, s * .34); c.closePath(); c.fill(); icc(c, s * .32, s * .54, s * .03, '#111'); },
+  seed_carrot(c, s) { ir(c, s * .32, s * .3, s * .36, s * .42, '#c8a86a'); icc(c, s * .5, s * .28, s * .1, '#e8760f'); },
+  seed_corn(c, s) { ir(c, s * .32, s * .3, s * .36, s * .42, '#c8a86a'); icc(c, s * .5, s * .28, s * .1, '#f2d94e'); },
+  seed_blueberry(c, s) { ir(c, s * .32, s * .3, s * .36, s * .42, '#c8a86a'); icc(c, s * .5, s * .28, s * .1, '#4a5fc4'); },
+  crop_carrot(c, s) { c.fillStyle = '#e8760f'; c.beginPath(); c.moveTo(s * .5, s * .88); c.lineTo(s * .64, s * .4); c.lineTo(s * .36, s * .4); c.closePath(); c.fill(); c.fillStyle = '#3a8a3a'; ir(c, s * .42, s * .2, s * .05, s * .2); ir(c, s * .5, s * .18, s * .05, s * .22); ir(c, s * .57, s * .2, s * .05, s * .2); c.fillStyle = '#f2924a'; ir(c, s * .44, s * .45, s * .05, s * .3); },
+  crop_corn(c, s) { c.fillStyle = '#f2d94e'; c.beginPath(); c.ellipse(s * .5, s * .55, s * .14, s * .3, 0, 0, Math.PI * 2); c.fill(); c.fillStyle = '#e0bc30'; for (let i = 0; i < 3; i++) for (let j = 0; j < 4; j++) icc(c, s * (.44 + i * .06), s * (.36 + j * .12), s * .022, '#c9a030'); c.fillStyle = '#5a9a3a'; c.beginPath(); c.moveTo(s * .36, s * .8); c.quadraticCurveTo(s * .3, s * .4, s * .42, s * .3); c.lineTo(s * .42, s * .8); c.closePath(); c.fill(); },
+  crop_blueberry(c, s) { icc(c, s * .4, s * .55, s * .13, '#4a5fc4'); icc(c, s * .6, s * .5, s * .13, '#5a6fd4'); icc(c, s * .5, s * .68, s * .13, '#3a4fb4'); c.fillStyle = 'rgba(255,255,255,0.4)'; icc(c, s * .37, s * .5, s * .04, 'rgba(255,255,255,0.5)'); ir(c, s * .46, s * .28, s * .08, s * .12, '#3a8a3a'); },
   default(c, s) { ir(c, s * .3, s * .3, s * .4, s * .4, '#888'); },
 };
