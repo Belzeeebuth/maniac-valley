@@ -41,6 +41,7 @@ Le jeu existe aussi en un **unique `public/classic.html`** ouvrable directement 
 - **Boss** avec barre de vie dédiée : **Giga Slime Maniac** (étage 5 — se divise, ondes de choc) et **Roi des Taupes Mutant** (étage 10 — s'enfouit, charge, fait tomber des rochers).
 - **Quêtes & boutique** : 3 quêtes actives tirées d'un pool (livraison, chasse, fabrication, minage) ; boutique PNJ d'achat/revente.
 - **UI style Stardew/Terraria** : panneaux bois/pierre, Hotbar 10 slots, inventaire 4×8 avec **drag-and-drop**, **infobulles de rareté** (Commun / Rare / Épique / Maniaque), **dégâts flottants** colorés et **popups de butin**.
+- **Rendu & post-traitement ("shaders" Canvas 2D)** : pixel art ombré en 3 tons avec ombres portées directionnelles (selon l'heure du soleil), **bloom / lumières émissives** floutées (torches, fourneau, lanterne du joueur, lucioles, récoltes prêtes, aura des boss), **color grading** cinématographique (golden hour, nuit bleutée, éclipse pourpre, pluie désaturée, teinte de mine), **particules d'ambiance** (pétales au printemps, feuilles en automne, poussières en été, lucioles la nuit), **grain de film**, fines scanlines et vignette.
 
 ## 📁 Architecture
 

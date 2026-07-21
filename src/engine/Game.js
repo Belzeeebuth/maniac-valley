@@ -11,6 +11,7 @@ import { Camera } from './Camera.js';
 import { InputHandler } from './InputHandler.js';
 import { SoundFX } from './SoundFX.js';
 import { Sprites } from '../graphics/SpriteSheetGenerator.js';
+import { PostFX } from '../graphics/PostFX.js';
 import { Player } from '../entities/Player.js';
 import { makeAnimal, updateAnimal, animalProduce } from '../entities/Animal.js';
 import { empowerEnemy } from '../entities/Enemy.js';
@@ -50,7 +51,9 @@ export class Game {
     this.mine = null;
     this.player = null;
 
-    this.effects = { floatTexts: [], shockwaves: [], fallingRocks: [], weatherParticles: [] };
+    this.effects = { floatTexts: [], shockwaves: [], fallingRocks: [], weatherParticles: [], ambient: [], fireflies: [] };
+    this.postfx = new PostFX(this.canvas);
+    this._sun = { skew: 0, alpha: 0 };
 
     this.modals = { inventory: false, crafting: false, quests: false, shop: false };
     this.faint = false;
@@ -89,7 +92,9 @@ export class Game {
     this.nightCanvas.width = window.innerWidth;
     this.nightCanvas.height = window.innerHeight;
     this.ctx.imageSmoothingEnabled = false;
+    if (this.postfx) this.postfx.resize();
     this._initWeatherParticles();
+    this._initAmbient();
   }
 
   // ---------------- Entrées ----------------
@@ -221,6 +226,7 @@ export class Game {
     this.quests.generate();
     this.time.day = 1; this.time.hour = 6; this.time.weather = 'sun';
     this.camera.snap(this.player, this.overworld.w, this.overworld.h, this.canvas.width, this.canvas.height);
+    this._initAmbient();
     this.hud.renderHotbar();
     this.toast('Bienvenue à Maniac Valley !');
   }
@@ -422,6 +428,7 @@ export class Game {
     for (const key in ow.rockTimers) if (ow.rockTimers[key] <= this.time.day) { const [x, y] = key.split(',').map(Number); ow.tilemap.set(x, y, OT.ROCK); delete ow.rockTimers[key]; }
     this.time.rollWeather();
     this._initWeatherParticles();
+    this._initAmbient();
   }
   sleepInBed() {
     this.advanceDay();
@@ -481,6 +488,7 @@ export class Game {
     this.camera.follow(this.player, this.curScene().w, this.curScene().h, this.canvas.width, this.canvas.height, dt);
     this._updateFloatTexts(dt);
     this._updateWeather(dt);
+    this._updateAmbient(dt);
     this.hud.update();
     this._updateInteractPrompt();
   }
@@ -530,17 +538,166 @@ export class Game {
     }
   }
 
-  // ---------------- Rendu ----------------
+  // ---------------- Ambiance (pétales / feuilles / poussière / lucioles) ----------------
+  _initAmbient() {
+    const W = this.canvas.width, H = this.canvas.height;
+    const season = this.time ? this.time.seasonKey : 'spring';
+    const arr = [];
+    let kind = null, n = 0;
+    if (season === 'spring') { kind = 'petal'; n = 26; }
+    else if (season === 'summer') { kind = 'mote'; n = 30; }
+    else if (season === 'autumn') { kind = 'leaf'; n = 30; }
+    for (let i = 0; i < n; i++) arr.push({
+      x: Math.random() * W, y: Math.random() * H, kind,
+      vx: rand(-14, -4), vy: rand(6, 18), rot: rand(0, 6.28), vr: rand(-2, 2),
+      sz: kind === 'mote' ? rand(1, 2.2) : rand(3, 5.5), ph: rand(0, 6.28),
+      col: kind === 'petal' ? (Math.random() < 0.5 ? '#ffd0e0' : '#fff2f6')
+         : kind === 'leaf' ? (Math.random() < 0.5 ? '#c9772a' : '#a8531e') : '#ffe9a8',
+    });
+    this.effects.ambient = arr;
+    this._ambientKind = kind;
+    // lucioles (nuit)
+    const ff = [];
+    for (let i = 0; i < 20; i++) ff.push({ x: Math.random() * W, y: Math.random() * H, ph: rand(0, 6.28), vx: rand(-10, 10), vy: rand(-10, 10) });
+    this.effects.fireflies = ff;
+  }
+
+  _updateAmbient(dt) {
+    const W = this.canvas.width, H = this.canvas.height;
+    for (const p of this.effects.ambient) {
+      p.ph += dt * 2;
+      p.x += (p.vx + Math.sin(p.ph) * 8) * dt;
+      p.y += p.vy * dt; p.rot += p.vr * dt;
+      if (p.y > H + 6) { p.y = -6; p.x = Math.random() * W; }
+      if (p.x < -6) p.x = W + 6;
+    }
+    for (const f of this.effects.fireflies) {
+      f.ph += dt * rand(1.5, 3.5);
+      f.x += Math.sin(f.ph) * 12 * dt + f.vx * dt * 0.2;
+      f.y += Math.cos(f.ph * 0.7) * 10 * dt + f.vy * dt * 0.2;
+      if (f.x < 0) f.x = W; if (f.x > W) f.x = 0;
+      if (f.y < 0) f.y = H; if (f.y > H) f.y = 0;
+    }
+  }
+
+  _firefliesActive() {
+    return this.scene === 'overworld' && this.time.ambient().alpha > 0.45 && !this.time.isRaining;
+  }
+
+  _renderAmbient() {
+    if (this.scene !== 'overworld') return;
+    const ctx = this.ctx;
+    for (const p of this.effects.ambient) {
+      ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot); ctx.globalAlpha = 0.85;
+      ctx.fillStyle = p.col;
+      if (p.kind === 'mote') { ctx.globalAlpha = 0.5; ctx.beginPath(); ctx.arc(0, 0, p.sz, 0, Math.PI * 2); ctx.fill(); }
+      else { ctx.beginPath(); ctx.ellipse(0, 0, p.sz, p.sz * 0.55, 0, 0, Math.PI * 2); ctx.fill(); }
+      ctx.restore();
+    }
+    ctx.globalAlpha = 1;
+    // corps des lucioles (le halo est ajouté au bloom)
+    if (this._firefliesActive()) {
+      for (const f of this.effects.fireflies) {
+        const a = 0.5 + Math.sin(f.ph) * 0.5;
+        ctx.globalAlpha = a; ctx.fillStyle = '#eaffa0';
+        ctx.beginPath(); ctx.arc(f.x, f.y, 1.6, 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  // ---------------- Ombres directionnelles (soleil) ----------------
+  _computeSun() {
+    if (this.scene !== 'overworld') { this._sun = { skew: 0, alpha: 0 }; return; }
+    const amb = this.time.ambient();
+    const daylight = Math.max(0, 1 - amb.alpha * 1.7);
+    const skew = Math.max(-1.4, Math.min(1.4, (this.time.hour - 13) / 6));
+    this._sun = { skew, alpha: 0.3 * daylight };
+  }
+  _sunShadow(cx, baseY, rx, ry) {
+    const s = this._sun; if (!s || s.alpha <= 0.02) return;
+    const off = -s.skew * ry * 1.4;
+    const c = this.ctx;
+    c.save(); c.globalAlpha = s.alpha; c.fillStyle = '#0a0a14';
+    c.beginPath(); c.ellipse(cx + off * 0.5, baseY, rx + Math.abs(off) * 0.5, ry * 0.5, 0, 0, Math.PI * 2); c.fill();
+    c.restore(); c.globalAlpha = 1;
+  }
+
+  // ---------------- Color grading ----------------
+  _computeGrade() {
+    const g = [];
+    if (this.scene === 'mine') {
+      g.push({ op: 'multiply', color: '#28324a', alpha: 0.34 });
+      g.push({ op: 'soft-light', color: '#1e3e50', alpha: 0.40 });
+      return g;
+    }
+    const h = this.time.hour, w = this.time.weather;
+    if (w === 'eclipse') { g.push({ op: 'multiply', color: '#3a1030', alpha: 0.5 }); g.push({ op: 'soft-light', color: '#7a1050', alpha: 0.42 }); return g; }
+    if (w === 'rain') { g.push({ op: 'saturation', color: '#808080', alpha: 0.38 }); g.push({ op: 'multiply', color: '#4a5a72', alpha: 0.30 }); g.push({ op: 'soft-light', color: '#38507a', alpha: 0.34 }); return g; }
+    if (w === 'snow') { g.push({ op: 'soft-light', color: '#a8c4e4', alpha: 0.32 }); g.push({ op: 'screen', color: '#20304a', alpha: 0.12 }); return g; }
+    if (h >= 6 && h < 8) { g.push({ op: 'soft-light', color: '#ff9a6a', alpha: 0.40 }); g.push({ op: 'multiply', color: '#ffdcc4', alpha: 0.14 }); }
+    else if (h >= 8 && h < 16) { g.push({ op: 'soft-light', color: '#fff2c0', alpha: 0.18 }); }
+    else if (h >= 16 && h < 19) { g.push({ op: 'soft-light', color: '#ffb04a', alpha: 0.44 }); g.push({ op: 'multiply', color: '#ffe0b0', alpha: 0.16 }); }
+    else { g.push({ op: 'multiply', color: '#26304e', alpha: 0.34 }); g.push({ op: 'soft-light', color: '#3a4e82', alpha: 0.42 }); }
+    return g;
+  }
+
+  // ---------------- Lumières émissives (bloom) ----------------
+  _renderLights() {
+    const fx = this.postfx, cam = this.camera, p = this.player;
+    fx.beginLights();
+    const amb = this.scene === 'overworld' ? this.time.ambient() : { alpha: 0.6 };
+    const night = amb.alpha > 0.35;
+    const flick = 0.8 + Math.sin(this.globalT * 12) * 0.2;
+
+    if (night || this.scene === 'mine') fx.addLight(p.cx - cam.x, p.cy - cam.y, 170, '255,180,95', night ? 0.62 : 0.5);
+
+    for (const o of this.curScene().placed) {
+      const lx = o.gx * TILE + TILE / 2 - cam.x, ly = o.gy * TILE + TILE / 2 - cam.y;
+      if (o.type === 'torch') fx.addLight(lx, ly - 6, 118, '255,150,55', (night ? 0.9 : 0.45) * flick);
+      else if (o.type === 'furnace') fx.addLight(lx, ly, 88, '255,120,40', 0.62 * flick);
+    }
+    for (const g of this.curScene().ground) if (g.kind === 'gold') fx.addLight(g.x - cam.x, g.y - cam.y, 34, '255,215,90', 0.5);
+
+    if (this.scene === 'overworld') {
+      // lueur douce des récoltes prêtes (visibles)
+      const ow = this.overworld;
+      const sx0 = Math.max(0, (cam.x / TILE) | 0), sy0 = Math.max(0, (cam.y / TILE) | 0);
+      const sx1 = Math.min(ow.w, ((cam.x + this.canvas.width) / TILE | 0) + 1);
+      const sy1 = Math.min(ow.h, ((cam.y + this.canvas.height) / TILE | 0) + 1);
+      for (let gy = sy0; gy < sy1; gy++) for (let gx = sx0; gx < sx1; gx++) {
+        const pl = ow.farmland[gx + ',' + gy];
+        if (pl && pl.cropId && pl.stage >= 3) fx.addLight(gx * TILE + 16 - cam.x, gy * TILE + 13 - cam.y, 26, '255,240,150', 0.4);
+      }
+      if (this._firefliesActive()) for (const f of this.effects.fireflies) fx.addLight(f.x, f.y, 22, '200,255,140', 0.5 + Math.sin(f.ph) * 0.4);
+    } else if (this.mine && this.mine.boss) {
+      const b = this.mine.boss;
+      fx.addLight(b.x - cam.x, b.y - cam.y, 60, b.kind === 'boss_gigaslime' ? '180,80,220' : '255,90,60', 0.5);
+    }
+    fx.compositeLights(this.ctx);
+  }
+
+  // ---------------- Rendu (pipeline avec post-traitement) ----------------
   render() {
     const ctx = this.ctx;
+    this._computeSun();
     ctx.fillStyle = '#000'; ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+    // 1) monde + ambiance + météo (couche "scène")
     if (this.scene === 'overworld') this._renderOverworld();
     else this._renderMine();
+    this._renderAmbient();
     this._renderPlacementPreview();
-    this._renderFloatTexts();
     this._renderWeather();
+    // 2) obscurité (masque de visibilité)
     this._renderNight();
-    this._renderVignette();
+    // 3) color grading cinématographique de la scène
+    this.postfx.applyGrade(ctx, this._computeGrade());
+    // 4) lumières émissives (bloom) par-dessus le grade
+    this._renderLights();
+    // 5) textes flottants nets, puis grain + vignette
+    this._renderFloatTexts();
+    this.postfx.grain(ctx, 0.04);
+    this.postfx.vignette(ctx, 0.32);
   }
 
   _renderOverworld() {
@@ -583,7 +740,10 @@ export class Game {
     const drawables = [];
     for (let gy = sy0; gy < sy1; gy++) for (let gx = sx0; gx < sx1; gx++)
       if (ow.tilemap.get(gx, gy) === OT.TREE)
-        drawables.push({ y: gy * TILE + TILE, fn: () => Sprites.tree(ctx, gx * TILE - cam.x, gy * TILE - cam.y, this.globalT, season) });
+        drawables.push({ y: gy * TILE + TILE, fn: () => {
+          this._sunShadow(gx * TILE + TILE / 2 - cam.x, gy * TILE + TILE - 2 - cam.y, 15, 9);
+          Sprites.tree(ctx, gx * TILE - cam.x, gy * TILE - cam.y, this.globalT, season);
+        } });
     for (const o of ow.placed) {
       if (o.type === 'fence') continue;
       const x = o.gx * TILE - cam.x, y = o.gy * TILE - cam.y;
@@ -645,6 +805,7 @@ export class Game {
   _drawPlayer() {
     const ctx = this.ctx, p = this.player;
     const sx = p.x - this.camera.x, sy = p.y - this.camera.y;
+    this._sunShadow(sx + p.w / 2, sy + p.h + 2, 10, 6);
     Sprites.player(ctx, sx, sy, p);
     if (p.attackTimer > 0) Sprites.swordSwing(ctx, sx, sy, p);
   }
@@ -720,29 +881,7 @@ export class Game {
     }
     nc.globalCompositeOperation = 'source-over';
     this.ctx.drawImage(this.nightCanvas, 0, 0);
-
-    // Halo chaud additif autour du joueur et des torches (ambiance nocturne)
-    if (info.alpha > 0.4) {
-      const ctx = this.ctx; ctx.save(); ctx.globalCompositeOperation = 'lighter';
-      const warm = (x, y, r, a) => {
-        const g = ctx.createRadialGradient(x, y, 2, x, y, r);
-        g.addColorStop(0, `rgba(255,180,90,${a})`); g.addColorStop(1, 'rgba(255,180,90,0)');
-        ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
-      };
-      warm(psx, psy, 150, 0.10);
-      for (const o of this.curScene().placed) {
-        if (o.type !== 'torch') continue;
-        warm(o.gx * TILE + TILE / 2 - this.camera.x, o.gy * TILE + TILE / 2 - this.camera.y, 110, 0.18);
-      }
-      ctx.restore();
-    }
-  }
-
-  _renderVignette() {
-    const ctx = this.ctx, W = this.canvas.width, H = this.canvas.height;
-    const g = ctx.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.36, W / 2, H / 2, Math.max(W, H) * 0.72);
-    g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(0,0,0,0.34)');
-    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    // (les halos chauds sont désormais gérés par le bloom émissif de PostFX)
   }
 
   // ---------------- Boucle ----------------
